@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SnapSell AI — ถ่ายรูปเดียว ได้การ์ดลงขาย</title>
+<style>
+  :root { --ink:#1c2430; --muted:#66707e; --line:#e3e7ec; --accent:#0f7a5c; --accent-dark:#0b5c45; --bg:#f6f8f9; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,"Noto Sans Thai",sans-serif; color:var(--ink); background:var(--bg); }
+  header { background:#101820; color:#fff; padding:26px 20px; }
+  .head-row { max-width:860px; margin:0 auto; display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+  header h1 { margin:0 0 6px; font-size:26px; }
+  header p { margin:0; color:#b9c4cf; max-width:720px; line-height:1.6; }
+  .lang { display:flex; gap:0; border:1px solid #3a4754; border-radius:999px; overflow:hidden; flex-shrink:0; }
+  .lang button { background:transparent; color:#b9c4cf; border:0; padding:8px 14px; font-size:14px; cursor:pointer; }
+  .lang button.active { background:#fff; color:#101820; font-weight:bold; }
+  main { max-width:860px; margin:0 auto; padding:20px; }
+  .how { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; line-height:1.8; }
+  .how b { color:var(--accent); }
+  .upload { background:#fff; border:1px solid var(--line); border-radius:16px; padding:24px 22px; text-align:center; margin:20px 0; box-shadow:0 2px 12px rgba(16,24,32,.06); }
+  .upload h2 { margin:0 0 16px; font-size:21px; }
+  .dropzone { border:2px dashed #b9c4cf; border-radius:14px; padding:28px 16px; cursor:pointer; transition:border-color .15s, background .15s; }
+  .dropzone:hover, .dropzone.over { border-color:var(--accent); background:#f0faf6; }
+  .dropzone .icon { font-size:40px; }
+  .dropzone .dz-text { margin-top:8px; font-size:16px; }
+  .dropzone .dz-sub { margin-top:4px; font-size:13px; color:var(--muted); }
+  .file-chip { display:none; margin:14px auto 0; background:#f0faf6; border:1px solid #bfe3d6; color:#0b5c45; border-radius:999px; padding:6px 14px; font-size:14px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-chip.show { display:inline-block; }
+  .cta { background:var(--accent); color:#fff; border:0; border-radius:10px; padding:14px 28px; font-size:17px; font-weight:bold; cursor:pointer; margin-top:18px; width:100%; max-width:340px; }
+  .cta:hover { background:var(--accent-dark); }
+  .cta:disabled { opacity:.5; }
+  .upload .note { color:var(--muted); font-size:13px; margin-top:14px; line-height:1.6; }
+  #status { margin-top:12px; color:var(--muted); min-height:20px; font-size:14px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; margin:20px 0; box-shadow:0 2px 12px rgba(16,24,32,.05); }
+  .card h2 { margin:0; padding:14px 16px 4px; font-size:19px; }
+  .card .detail { padding:0 16px 14px; line-height:1.7; color:#333; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .pair figure { margin:0; overflow:hidden; }
+  .pair img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
+  .pair figcaption { font-size:12px; color:var(--muted); padding:6px 10px; }
+  .meta { padding:10px 16px; font-size:13px; color:var(--muted); }
+  .price { color:#b45309; font-weight:bold; }
+  footer { text-align:center; color:var(--muted); font-size:13px; padding:20px; line-height:1.8; }
+  @media (max-width:600px) { .pair { grid-template-columns:1fr; } .head-row { flex-direction:column; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <div>
+      <h1>SnapSell AI 📸</h1>
+      <p data-i18n="tagline">พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark</p>
+    </div>
+    <div class="lang">
+      <button id="btn-th" class="active" onclick="setLang('th')">ไทย</button>
+      <button id="btn-en" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="how" data-i18n="how"></div>
+
+  <div class="upload">
+    <h2 data-i18n="uploadTitle">ลองของจริง — อัปโหลดรูปสินค้า</h2>
+    <div class="dropzone" id="dz" onclick="document.getElementById('photo').click()">
+      <div class="icon">📸</div>
+      <div class="dz-text" data-i18n="dzText">ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์</div>
+      <div class="dz-sub" data-i18n="dzSub">รองรับไฟล์รูป JPG / PNG</div>
+    </div>
+    <input type="file" id="photo" accept="image/*" hidden>
+    <div class="file-chip" id="chip"></div>
+    <br>
+    <button class="cta" id="go" onclick="process()" data-i18n="cta">ทำเป็นการ์ดลงขาย</button>
+    <div id="status"></div>
+    <div class="note" data-i18n="uploadNote">โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด</div>
+  </div>
+  <div id="live"></div>
+
+  <h2 data-i18n="galleryTitle">การ์ดตัวอย่าง — ผลลัพธ์จริงทั้ง 5 ใบ</h2>
+
+  <article class="card">
+    <h2 data-i18n="t1">คาลบี้ บันบัน ขนมถั่วลันเตาอบกรอบ รสดั้งเดิม ซองใหญ่</h2>
+    <div class="pair">
+      <figure><img src="assets/before1.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
+      <figure><img src="assets/after1.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+    </div>
+    <div class="detail" data-i18n="d1">ขนมถั่วลันเตาอบกรอบแบรนด์ Calbee BunBun รสดั้งเดิม ถุงสีเขียวตามในรูป มีลายตัวการ์ตูนถั่วลันเตาอยู่ด้านหน้า เป็นขนาดซองใหญ่ตามที่ระบุไว้บนบรรจุภัณฑ์</div>
+    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+  </article>
+
+  <article class="card">
+    <h2 data-i18n="t2">โกปิโก้ ลัคกี้เดย์ กาแฟ เข้ม หวานมัน ขวดพลาสติกฝาดำ</h2>
+    <div class="pair">
+      <figure><img src="assets/before2.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปย้อนแสงที่มีมือบัง</figcaption></figure>
+      <figure><img src="assets/after2.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+    </div>
+    <div class="detail" data-i18n="d2">เครื่องดื่มกาแฟบรรจุในขวดพลาสติกขนาดพกพา ฝาปิดเกลียวสีดำตามในรูป ฉลากขวดสีน้ำตาลระบุว่าเป็นรสกาแฟเข้มหวานมัน สินค้าตรงตามที่เห็นในภาพ</div>
+    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+  </article>
+
+  <article class="card">
+    <h2 data-i18n="t3">แลคตาซอย นมถั่วเหลือง สูตรต้นตำรับ Original ขนาด 500 มล.</h2>
+    <div class="pair">
+      <figure><img src="assets/before3.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
+      <figure><img src="assets/after3.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+    </div>
+    <div class="detail" data-i18n="d3">นมถั่วเหลืองแลคตาซอย สูตรต้นตำรับ รสชาติอร่อยดื่มง่าย เป็นผลิตภัณฑ์ของประเทศไทย ปริมาตรสุทธิ 500 มล. ให้โปรตีนและกรดอะมิโนจำเป็น เหมาะสำหรับผู้ที่ต้องการพลังงานในการดำเนินชีวิตประจำวัน ช่วยให้อิ่มท้องในชั่วโมงเร่งด่วน อิ่มอร่อยเต็มกล่องสำหรับคุณและทุกคนในครอบครัว</div>
+    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+  </article>
+
+  <article class="card">
+    <h2 data-i18n="t4">CIELO Sparkling Honey Lemon Soda เซโล น้ำผึ้งมะนาวโซดา 600 มล.</h2>
+    <div class="pair">
+      <figure><img src="assets/before4.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — ขวดใส พื้นหลังรก</figcaption></figure>
+      <figure><img src="assets/after4.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+    </div>
+    <div class="detail" data-i18n="d4">เครื่องดื่มกลิ่นน้ำผึ้งมะนาวโซดา ตราเซโล (CIELO Sparkling Honey Lemon Soda) บรรจุขวดพลาสติกใส ปริมาตรสุทธิ 600 มล. บนฉลากระบุว่ามีวิตามินซีที่มีส่วนช่วยในกระบวนการต่อต้านอนุมูลอิสระ</div>
+    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+  </article>
+
+  <article class="card">
+    <h2 data-i18n="t5">น้ำดื่ม 7 Select ขวดพลาสติกใส ฝาเขียว ฉลากเขียว</h2>
+    <div class="pair">
+      <figure><img src="assets/before5.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
+      <figure><img src="assets/after5.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+    </div>
+    <div class="detail" data-i18n="d5">น้ำดื่มบรรจุในขวดพลาสติกใส มีฝาปิดสีเขียวและฉลากสีเขียวพิมพ์โลโก้ 7 SELECT สภาพสินค้าตามที่เห็นในรูป เหมาะสำหรับพกพาดื่มระหว่างวัน</div>
+    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+  </article>
+</main>
+<footer data-i18n="footer">
+  SnapSell AI — Meta Global AI Developer Hackathon 2026 (Indie track)<br>
+  สร้างด้วย SAM 3.1, Muse Image 1.0 และ Muse Spark 1.3 ผ่าน Meta Model API
+</footer>
+<script>
+const I18N = {
+  th: {
+    tagline: 'พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark',
+    how: 'วิธีใช้: <b>1.</b> ถ่ายรูปสินค้า <b>2.</b> SAM 3.1 หาตำแหน่งสินค้า <b>3.</b> Muse Image วาดรูปสตูดิโอใหม่โดยคงสินค้าและฉลากเดิม <b>4.</b> Muse Spark เขียนข้อความลงขายจากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น',
+    uploadTitle: 'ลองของจริง — อัปโหลดรูปสินค้า',
+    dzText: 'ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์',
+    dzSub: 'รองรับไฟล์รูป JPG / PNG',
+    cta: 'ทำเป็นการ์ดลงขาย',
+    uploadNote: 'โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด',
+    galleryTitle: 'การ์ดตัวอย่าง — ผลลัพธ์จริงทั้ง 5 ใบ',
+    capBefore: 'ก่อน — รูปที่ถ่ายมา', capAfter: 'หลัง — รูปสตูดิโอจาก Muse Image',
+    priceLabel: 'ราคา:', priceSoon: '— (รอระบบแนะนำราคา)',
+    t1: 'คาลบี้ บันบัน ขนมถั่วลันเตาอบกรอบ รสดั้งเดิม ซองใหญ่',
+    d1: 'ขนมถั่วลันเตาอบกรอบแบรนด์ Calbee BunBun รสดั้งเดิม ถุงสีเขียวตามในรูป มีลายตัวการ์ตูนถั่วลันเตาอยู่ด้านหน้า เป็นขนาดซองใหญ่ตามที่ระบุไว้บนบรรจุภัณฑ์',
+    t2: 'โกปิโก้ ลัคกี้เดย์ กาแฟ เข้ม หวานมัน ขวดพลาสติกฝาดำ',
+    d2: 'เครื่องดื่มกาแฟบรรจุในขวดพลาสติกขนาดพกพา ฝาปิดเกลียวสีดำตามในรูป ฉลากขวดสีน้ำตาลระบุว่าเป็นรสกาแฟเข้มหวานมัน สินค้าตรงตามที่เห็นในภาพ',
+    t3: 'แลคตาซอย นมถั่วเหลือง สูตรต้นตำรับ Original ขนาด 500 มล.',
+    d3: 'นมถั่วเหลืองแลคตาซอย สูตรต้นตำรับ รสชาติอร่อยดื่มง่าย เป็นผลิตภัณฑ์ของประเทศไทย ปริมาตรสุทธิ 500 มล. ให้โปรตีนและกรดอะมิโนจำเป็น เหมาะสำหรับผู้ที่ต้องการพลังงานในการดำเนินชีวิตประจำวัน ช่วยให้อิ่มท้องในชั่วโมงเร่งด่วน อิ่มอร่อยเต็มกล่องสำหรับคุณและทุกคนในครอบครัว',
+    t4: 'CIELO Sparkling Honey Lemon Soda เซโล น้ำผึ้งมะนาวโซดา 600 มล.',
+    d4: 'เครื่องดื่มกลิ่นน้ำผึ้งมะนาวโซดา ตราเซโล (CIELO Sparkling Honey Lemon Soda) บรรจุขวดพลาสติกใส ปริมาตรสุทธิ 600 มล. บนฉลากระบุว่ามีวิตามินซีที่มีส่วนช่วยในกระบวนการต่อต้านอนุมูลอิสระ',
+    t5: 'น้ำดื่ม 7 Select ขวดพลาสติกใส ฝาเขียว ฉลากเขียว',
+    d5: 'น้ำดื่มบรรจุในขวดพลาสติกใส มีฝาปิดสีเขียวและฉลากสีเขียวพิมพ์โลโก้ 7 SELECT สภาพสินค้าตามที่เห็นในรูป เหมาะสำหรับพกพาดื่มระหว่างวัน',
+    footer: 'SnapSell AI — Meta Global AI Developer Hackathon 2026 (Indie track)<br>สร้างด้วย SAM 3.1, Muse Image 1.0 และ Muse Spark 1.3 ผ่าน Meta Model API',
+    noFile: 'เลือกรูปก่อนนะ', processing: 'กำลังตัดรูปสินค้า… วาดรูปสตูดิโอ… เขียนแคปชัน… รอสักครู่',
+    fail: 'ทำไม่สำเร็จ: ', serverFail: 'ต่อเซิร์ฟเวอร์เดโมไม่ได้ — เปิดผ่าน python3 server.py แล้วลองใหม่ (การ์ดตัวอย่างข้างล่างยังดูได้ปกติ)',
+    done: 'เสร็จแล้ว — การ์ดอยู่ด้านบน', yourCard: 'การ์ดของคุณ',
+    liveBefore: 'ก่อน — รูปที่อัปโหลด', liveAfter: 'หลัง — รูปสตูดิโอ', foundWith: 'SAM เจอสินค้าด้วยคำว่า '
+  },
+  en: {
+    tagline: 'Small sellers shoot product photos on their phones — messy, badly lit, a hand in the frame. SnapSell takes one photo and returns a ready-to-post listing card: a clean studio shot + title + description. Powered by SAM 3.1 → Muse Image → Muse Spark.',
+    how: 'How it works: <b>1.</b> Snap the product <b>2.</b> SAM 3.1 locates it <b>3.</b> Muse Image re-renders a studio shot keeping the real product and label <b>4.</b> Muse Spark writes the listing from what is actually visible — never inventing a price or a spec that is not in the photo.',
+    uploadTitle: 'Try it live — upload a product photo',
+    dzText: 'Drop your photo here, or tap to choose a file',
+    dzSub: 'JPG / PNG supported',
+    cta: 'Make my listing card',
+    uploadNote: 'Live upload needs the demo server (python3 server.py). Opened as a plain file it will not work — but the 5 sample cards below are all real outputs from the full pipeline.',
+    galleryTitle: 'Sample cards — all 5 are real outputs',
+    capBefore: 'Before — the original photo', capAfter: 'After — studio shot by Muse Image',
+    priceLabel: 'Price:', priceSoon: '— (price suggestion coming soon)',
+    t1: 'Calbee BunBun Green Pea Snack, Original Flavor, Big Bag',
+    d1: 'Calbee BunBun crispy green pea snack, original flavor, in the green bag shown in the photo with the pea mascot on the front. Big bag size as printed on the packaging.',
+    t2: 'Kopiko Lucky Day Coffee, Strong and Sweet, Black-Cap Plastic Bottle',
+    d2: 'Ready-to-drink coffee in a portable plastic bottle with a black screw cap as shown in the photo. The brown label marks it as strong, sweet coffee. The product matches the photo.',
+    t3: 'Lactasoy Original Soy Milk, 500 ml',
+    d3: 'Lactasoy original-recipe soy milk, tasty and easy to drink, a product of Thailand. Net volume 500 ml. Provides protein and essential amino acids, good for people who need energy through the day and something filling in a rush — a full box for you and the whole family.',
+    t4: 'CIELO Sparkling Honey Lemon Soda, 600 ml',
+    d4: 'Honey lemon soda by CIELO (CIELO Sparkling Honey Lemon Soda) in a clear plastic bottle, net volume 600 ml. The label states it contains vitamin C, which helps with antioxidant processes.',
+    t5: '7 Select Drinking Water, Clear Plastic Bottle, Green Cap and Label',
+    d5: 'Drinking water in a clear plastic bottle with a green cap and green label printed with the 7 SELECT logo. Condition as shown in the photo. Easy to carry and drink through the day.',
+    footer: 'SnapSell AI — Meta Global AI Developer Hackathon 2026 (Indie track)<br>Built with SAM 3.1, Muse Image 1.0 and Muse Spark 1.3 via the Meta Model API',
+    noFile: 'Pick a photo first', processing: 'Segmenting the product… rendering the studio shot… writing the copy… one moment',
+    fail: 'Failed: ', serverFail: 'Could not reach the demo server — run it with python3 server.py and try again (the sample cards below still work fine)',
+    done: 'Done — your card is above', yourCard: 'Your card',
+    liveBefore: 'Before — your upload', liveAfter: 'After — studio shot', foundWith: 'SAM found the product as '
+  }
+};
+let LANG = localStorage.getItem('snapsell-lang') || 'th';
+// API base for the live pipeline. Empty = same origin (local server.py).
+// The Pages deploy replaces __SNAPSELL_API_BASE__ with the public tunnel URL.
+const API_BASE = '__SNAPSELL_API_BASE__';
+function setLang(l) {
+  LANG = l;
+  localStorage.setItem('snapsell-lang', l);
+  document.documentElement.lang = l;
+  document.getElementById('btn-th').classList.toggle('active', l === 'th');
+  document.getElementById('btn-en').classList.toggle('active', l === 'en');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const v = I18N[l][el.dataset.i18n];
+    if (v !== undefined) el.innerHTML = v;
+  });
+}
+setLang(LANG);
+const dz = document.getElementById('dz');
+const input = document.getElementById('photo');
+const chip = document.getElementById('chip');
+function showChip() {
+  if (input.files[0]) { chip.textContent = '📎 ' + input.files[0].name; chip.classList.add('show'); }
+}
+input.addEventListener('change', showChip);
+['dragover', 'dragenter'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('over'); }));
+['dragleave', 'drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('over'); }));
+dz.addEventListener('drop', ev => { if (ev.dataTransfer.files[0]) { input.files = ev.dataTransfer.files; showChip(); } });
+async function process() {
+  const f = input.files[0];
+  const st = document.getElementById('status');
+  const btn = document.getElementById('go');
+  const T = I18N[LANG];
+  if (!f) { st.textContent = T.noFile; return; }
+  btn.disabled = true;
+  st.textContent = T.processing;
+  const fd = new FormData();
+  fd.append('photo', f);
+  fd.append('lang', LANG);
+  try {
+    const r = await fetch(API_BASE + '/api/process', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!j.ok) { st.textContent = T.fail + (j.error || ''); return; }
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\*\*/g, '').replace(/\n/g, '<br>');
+    document.getElementById('live').innerHTML =
+      '<article class="card"><h2>' + T.yourCard + '</h2>' +
+      '<div class="pair"><figure><img src="' + URL.createObjectURL(f) + '"><figcaption>' + T.liveBefore + '</figcaption></figure>' +
+      '<figure><img src="data:image/png;base64,' + j.studio_b64 + '"><figcaption>' + T.liveAfter + '</figcaption></figure></div>' +
+      '<div class="detail">' + esc(j.copy) + '</div>' +
+      '<div class="meta">' + T.priceLabel + ' <span class="price">' + T.priceSoon + '</span> · ' + T.foundWith + esc(j.concept) + '</div></article>';
+    st.textContent = T.done;
+  } catch (e) {
+    st.textContent = T.serverFail;
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

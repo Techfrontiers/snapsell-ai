@@ -1,0 +1,4 @@
+# No third-party dependencies.
+# Stub mode and live mode both run on the Python 3.10+ standard library.
+# (Pillow is used opportunistically for the stub studio copy if installed;
+# without it the stub falls back to a plain file copy.)
