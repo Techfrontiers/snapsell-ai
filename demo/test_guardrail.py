@@ -138,6 +138,63 @@ class TestEnforceClaims(unittest.TestCase):
         self.assertNotIn("Price", safe)
 
 
+class TestValueMatching(unittest.TestCase):
+    SELLER = "ราคา 35 บาท, ขนาด 120 กรัม"
+
+    def test_mismatched_price_and_size_stripped(self):
+        # GPT second-pass regression: seller 35 baht / 120 g, model
+        # writes 999 baht / 500 g — both must be stripped.
+        desc = "Snack costs 999 baht. Net weight 500 g."
+        safe, removed = server.enforce_claims(desc, self.SELLER, "en")
+        self.assertEqual(safe, server.MIN_DESC["en"])
+        self.assertNotIn("999", safe)
+        self.assertNotIn("500 g", safe)
+        self.assertTrue(any("price-mismatch" in r for r in removed))
+        self.assertTrue(any("size-mismatch" in r for r in removed))
+
+    def test_matching_price_and_size_kept(self):
+        desc = "Snack costs 35 baht. Net weight 120 g."
+        safe, removed = server.enforce_claims(desc, self.SELLER, "en")
+        self.assertIn("35 baht", safe)
+        self.assertIn("120 g", safe)
+        self.assertEqual(removed, [])
+
+    def test_size_unit_conversion_match_kept(self):
+        # 0.12 kg == 120 g after conversion, so it is consistent.
+        safe, removed = server.enforce_claims(
+            "Net weight 0.12 kg.", self.SELLER, "en")
+        self.assertIn("0.12 kg", safe)
+        self.assertEqual(removed, [])
+
+    def test_partial_price_match_still_stripped(self):
+        # Fail-closed: ANY unverified price in the sentence strips it,
+        # even if another price in the same sentence matches.
+        desc = "Was 999 baht, now 35 baht."
+        safe, removed = server.enforce_claims(desc, self.SELLER, "en")
+        self.assertNotIn("999", safe)
+        self.assertTrue(any("price-mismatch" in r for r in removed))
+
+    def test_price_without_seller_price_is_unverified(self):
+        safe, removed = server.enforce_claims("Only ฿129.", "", "en")
+        self.assertEqual(safe, server.MIN_DESC["en"])
+        self.assertTrue(any("price-unverified" in r for r in removed))
+
+    def test_health_benefit_cures_tiredness_stripped(self):
+        # GPT item 3: health-benefit wording, no vitamin word needed.
+        desc = "Tasty snack. This snack cures tiredness."
+        safe, removed = server.enforce_claims(desc, "", "en")
+        self.assertIn("Tasty snack.", safe)
+        self.assertNotIn("cures tiredness", safe)
+        self.assertTrue(any("health-benefit" in r for r in removed))
+
+    def test_health_benefit_never_seller_exempt(self):
+        # A seller asserting a health benefit does not verify it.
+        desc = "This snack cures tiredness."
+        safe, removed = server.enforce_claims(desc, "vitamin C", "en")
+        self.assertEqual(safe, server.MIN_DESC["en"])
+        self.assertTrue(any("health-benefit" in r for r in removed))
+
+
 class TestRunPipelineFallbacks(unittest.TestCase):
     def _patched_run(self, spark_result):
         from PIL import Image
@@ -191,6 +248,13 @@ class TestSafeRendering(unittest.TestCase):
         proc = html[html.index("async function process()"):]
         self.assertNotIn("esc(j.copy)", proc)
         self.assertNotIn("esc(j.concept)", proc)
+
+    def test_seller_note_says_match_is_not_verified(self):
+        # GPT item 4: even a matching seller value is not presented
+        # as independently verified truth.
+        html = open(os.path.join(HERE, "index.html")).read()
+        self.assertIn("a match does not mean verified", html)
+        self.assertIn("ค่าที่ตรงกันไม่ได้แปลว่าผ่านการตรวจสอบแล้ว", html)
 
 
 if __name__ == "__main__":
