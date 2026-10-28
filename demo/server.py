@@ -5,7 +5,7 @@ Serves the static gallery from this directory and implements the live
 pipeline behind POST /api/process:
 
     upload photo -> SAM 3.1 box -> padded crop -> Muse Image edits
-    (clean studio background) -> Muse Spark Thai listing copy
+    (clean studio background) -> Muse Spark evidence-first listing copy (EN/TH) with a separate Needs confirmation section (Phase 1)
     -> JSON with the studio image and the copy.
 
 Run:  python3 server.py [port]        (default 8000, localhost only)
@@ -36,14 +36,114 @@ BOX_RE = re.compile(r"<\|box;x1=(\d+);y1=(\d+);x2=(\d+);y2=(\d+);w=(\d+);h=(\d+)
 # SAM needs a concrete noun. A generic concept can come back empty, so
 # retry with more specific nouns before giving up.
 CONCEPTS = ["product", "bottle", "package", "box"]
+# Phase 1 (evidence-first guardrail): copy only from visible evidence +
+# seller-provided facts. Anything unsupported goes in a delimited
+# NEEDS_CONFIRMATION section, never in the title/description. The
+# marker is identical in both languages so the parser stays simple.
 COPY_PROMPT = {
-    "th": ("ดูรูปสินค้านี้แล้วเขียนข้อความลงขายแบบ Shopee เป็นภาษาไทย: "
-           "ชื่อสินค้า 1 บรรทัด และรายละเอียดสั้นๆ 2-3 ประโยค "
-           "ห้ามแต่งราคาหรือคุณสมบัติที่มองไม่เห็นในรูป"),
-    "en": ("Look at this product photo and write a Shopee-style listing in English: "
-           "a 1-line product title and a short 2-3 sentence description. "
-           "Do not invent a price or any spec that is not visible in the photo"),
+    "th": ("เขียนข้อความลงขายจากหลักฐานเท่านั้น: ใช้เฉพาะสิ่งที่มองเห็น"
+           "ในรูปสินค้า และข้อมูลที่ผู้ขายให้มาเท่านั้น "
+           "ห้ามแต่งราคา คุณสมบัติทางโภชนาการ การรับรอง ความเข้ากันได้ "
+           "หรือความพร้อมจำหน่าย ถ้าข้อมูลใดไม่มีหลักฐาน ห้ามใส่ในชื่อ"
+           "หรือรายละเอียด ให้ใส่ในส่วน NEEDS_CONFIRMATION แทน "
+           "เขียนชื่อสินค้า 1 บรรทัด และรายละเอียด 2-3 ประโยคจาก"
+           "ข้อเท็จจริงที่ยืนยันได้เท่านั้น อย่าปล่อยให้รายละเอียดว่างเปล่า"
+           "ถ้ายังมีข้อเท็จจริงที่ยืนยันได้ รูปแบบผลลัพธ์:\n"
+           "[ชื่อสินค้า]\n[รายละเอียด]\nNEEDS_CONFIRMATION:\n"
+           "- [ข้อมูลที่ต้องยืนยันทีละข้อ]"),
+    "en": ("Write a listing ONLY from evidence: use only what is visible "
+           "in the product photo and facts supplied by the seller. "
+           "Do not invent a price, nutritional properties, certification, "
+           "compatibility, or availability. If a fact has no evidence, "
+           "do NOT put it in the title or description; put it in the "
+           "NEEDS_CONFIRMATION section instead. Write a 1-line title and "
+           "a 2-3 sentence description from confirmed facts only; do not "
+           "leave the description empty while confirmed facts exist. "
+           "Output format:\n[title]\n[description]\nNEEDS_CONFIRMATION:\n"
+           "- [one item to confirm per line]"),
 }
+FALLBACK_NEEDS = {
+    "th": "แยกข้อเท็จจริงที่ยืนยันได้กับที่ยังยืนยันไม่ได้ไม่ออก — ตรวจสอบก่อนลงขาย",
+    "en": "Could not separate confirmed facts from unconfirmed claims — verify before listing",
+}
+NEEDS_PRICE = {
+    "th": "ราคาปรากฏในข้อความแต่ผู้ขายไม่ได้ให้ราคามา — ยืนยันราคาก่อนลงขาย",
+    "en": "Price appears in the copy but no price was supplied — verify price before listing",
+}
+NEEDS_AVAIL = {
+    "th": "ข้อความอ้างความพร้อมจำหน่ายหรือร้านที่ขายแต่ผู้ขายไม่ได้ให้ข้อมูลนี้มา — ยืนยันก่อนลงขาย",
+    "en": "Availability or a retailer is mentioned but not supplied — verify before listing",
+}
+MIN_DESC = {
+    "th": "สินค้าตามในรูป.",
+    "en": "Product shown in the photo.",
+}
+PRICE_RE = re.compile(r"[฿$]\s*\d|\d+\s*บาท|THB\s*\d|\d+\s*THB", re.I)
+# Retailer tokens are checked precisely (a seller fact phrased as
+# "sold at 7-Eleven" must satisfy a copy claim phrased as
+# "available at 7-Eleven"). Generic availability phrases fall back to
+# checking whether the seller supplied ANY availability wording at all.
+RETAILER_TOKENS = ["7-eleven", "เซเว่น"]
+GENERIC_AVAIL_PHRASES = ["มีขายที่", "หาซื้อได้ที่", "available at", "sold at"]
+AVAIL_KEYWORDS = ["ขาย", "available", "sold", "จำหน่าย", "retail", "store", "ร้าน"]
+
+
+def parse_copy(copy_text, lang="th"):
+    """Split Spark output into (description, needs_confirmation).
+
+    Pure function (no network) so it is unit-testable. If the model
+    omits the NEEDS_CONFIRMATION marker, the whole text is kept as the
+    description and a fallback warning is added — never silently
+    shipped as verified, never crashed.
+    """
+    lang = lang if lang in FALLBACK_NEEDS else "th"
+    lines = (copy_text or "").splitlines()
+    marker_idx = None
+    for i, line in enumerate(lines):
+        if line.strip().rstrip(":") == "NEEDS_CONFIRMATION":
+            marker_idx = i
+            break
+    if marker_idx is None:
+        desc = (copy_text or "").strip()
+        needs = [FALLBACK_NEEDS[lang]]
+    else:
+        desc = "\n".join(lines[:marker_idx]).strip()
+        needs = [ln.strip()[1:].strip() for ln in lines[marker_idx + 1:]
+                 if ln.strip().startswith("-") and ln.strip()[1:].strip()]
+    if not desc:
+        desc = MIN_DESC[lang]
+        if not needs:
+            needs = [FALLBACK_NEEDS[lang]]
+    return desc, needs
+
+
+def check_claims(description, seller_facts, lang="th"):
+    """Deterministic post-checks on the description (pure, testable).
+
+    Flags, never silently deletes: a flagged claim stays visible in
+    the description but is also listed under needs_confirmation, so
+    the seller verifies before publishing.
+    """
+    lang = lang if lang in FALLBACK_NEEDS else "th"
+    seller = (seller_facts or "").lower()
+    needs = []
+    price_supplied = any(t in seller for t in ["฿", "$", "บาท", "thb", "price", "ราคา"])
+    if PRICE_RE.search(description or "") and not price_supplied:
+        needs.append(NEEDS_PRICE[lang])
+    desc_lower = (description or "").lower()
+    avail_flagged = False
+    for retailer in RETAILER_TOKENS:
+        if retailer in desc_lower and retailer not in seller:
+            avail_flagged = True
+            break
+    if not avail_flagged:
+        for phrase in GENERIC_AVAIL_PHRASES:
+            if phrase in desc_lower and not any(k in seller for k in AVAIL_KEYWORDS):
+                avail_flagged = True
+                break
+    if avail_flagged:
+        needs.append(NEEDS_AVAIL[lang])
+    return needs
 EDIT_PROMPT = ("Place this exact product on a clean light-grey seamless studio background. "
                "Keep the product, its packaging, colors, label and all text exactly unchanged. "
                "Remove the background completely. Soft even studio lighting, "
@@ -71,7 +171,7 @@ def sam_box(data_url):
     return None, None
 
 
-def run_pipeline(img_bytes, lang="th"):
+def run_pipeline(img_bytes, lang="th", seller_facts=""):
     data_url = "data:image/jpeg;base64," + base64.b64encode(img_bytes).decode()
     box, concept = sam_box(data_url)
     if not box:
@@ -93,17 +193,28 @@ def run_pipeline(img_bytes, lang="th"):
     studio_b64 = payload.get("data", [{}])[0].get("b64_json")
     if not studio_b64:
         return {"ok": False, "error": "วาดรูปสตูดิโอไม่สำเร็จ"}
+    prompt_text = COPY_PROMPT.get(lang, COPY_PROMPT["th"])
+    if (seller_facts or "").strip():
+        prompt_text += ("\n\nSeller-provided facts (seller input, not image evidence):\n"
+                        + seller_facts.strip())
+    else:
+        prompt_text += "\n\nSeller-provided facts: none."
     status, spark = call("POST", "/chat/completions", {
         "model": "muse-spark-1.3",
         "messages": [{"role": "user", "content": [
-            {"type": "text", "text": COPY_PROMPT.get(lang, COPY_PROMPT["th"])},
+            {"type": "text", "text": prompt_text},
             {"type": "image_url", "image_url": {"url": data_url}}]}],
         "max_tokens": 2048}, timeout=180)
     copy_text = ""
     if status == 200:
         copy_text = spark["choices"][0]["message"]["content"] or ""
+    description, needs = parse_copy(copy_text, lang)
+    for extra in check_claims(description, seller_facts, lang):
+        if extra not in needs:
+            needs.append(extra)
     return {"ok": True, "concept": concept, "box": box,
-            "studio_b64": studio_b64, "copy": copy_text}
+            "studio_b64": studio_b64, "copy": description,
+            "description": description, "needs_confirmation": needs}
 
 
 # Abuse guard for the public tunnel: the server spends the owner's Meta
@@ -156,8 +267,9 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             img_bytes = form["photo"].file.read()
             lang = form.getvalue("lang", "th") if "lang" in form else "th"
+            facts = form.getvalue("facts", "") if "facts" in form else ""
             try:
-                result = run_pipeline(img_bytes, lang)
+                result = run_pipeline(img_bytes, lang, facts)
             except Exception as e:  # never leak a stack trace to the client
                 result = {"ok": False, "error": "pipeline ล้ม: %s" % e}
         body = json.dumps(result, ensure_ascii=False).encode("utf-8")
