@@ -78,23 +78,43 @@ MIN_DESC = {
     "th": "สินค้าตามในรูป.",
     "en": "Product shown in the photo.",
 }
-PRICE_RE = re.compile(r"[฿$]\s*\d|\d+\s*บาท|THB\s*\d|\d+\s*THB", re.I)
-# Retailer tokens are checked precisely (a seller fact phrased as
-# "sold at 7-Eleven" must satisfy a copy claim phrased as
-# "available at 7-Eleven"). Generic availability phrases fall back to
-# checking whether the seller supplied ANY availability wording at all.
+SELLER_NOTE = {
+    "th": "อย่านำเสนอข้อมูลจากผู้ขายว่าเป็นข้อเท็จจริงที่ผ่านการตรวจสอบอิสระแล้ว",
+    "en": "Do not present seller claims as independently verified facts.",
+}
+# Claim categories enforced deterministically (sentence-level strip).
+# A category is exempt only when the seller supplied that kind of fact.
+# Current-availability wording is NEVER exempt: naming a retailer is
+# not proof of current stock (GPT review issue 2).
+CATEGORY_PATTERNS = {
+    "price": re.compile(r"[฿$]\s*\d|\d+\s*บาท|THB\s*\d|\d+\s*THB", re.I),
+    "nutrition": re.compile(r"protein|โปรตีน|vitamin|วิตามิน|nutrition|โภชนาการ|calorie|แคลอรี่|amino|อะมิโน|antioxidant|สารต้านอนุมูลอิสระ|fibre|fiber|ใยอาหาร", re.I),
+    "certification": re.compile(r"certif|รับรอง|มาตรฐาน|\bISO\b|\bFDA\b|อย\.|halal|ฮาลาล|organic|ออร์แกนิก|\bGMP\b|\bHACCP\b", re.I),
+    "compatibility": re.compile(r"compatible|เข้ากันได้|ใช้กับ|works with|เหมาะสำหรับ|ใช้ได้กับ", re.I),
+    "size": re.compile(r"\d+\s*(ml|g|kg|oz|cm|mm|กรัม|กิโลกรัม|มิลลิลิตร|ลิตร|ซม\.?|มม\.?)", re.I),
+}
+CATEGORY_SELLER_KEYS = {
+    "price": ["฿", "$", "บาท", "thb", "price", "ราคา"],
+    "nutrition": ["โปรตีน", "protein", "วิตามิน", "vitamin", "โภชนาการ", "nutrition", "แคลอรี่", "calorie", "อะมิโน", "amino"],
+    "certification": ["รับรอง", "มาตรฐาน", "certif", "iso", "fda", "อย.", "halal", "ฮาลาล", "organic", "ออร์แกนิก"],
+    "compatibility": ["เข้ากันได้", "compatible", "ใช้กับ", "works with", "เหมาะสำหรับ"],
+    "size": ["กรัม", "กิโลกรัม", "มิลลิลิตร", "ลิตร", "ml", "ขนาด", "size", "น้ำหนัก", "weight"],
+}
 RETAILER_TOKENS = ["7-eleven", "เซเว่น"]
 GENERIC_AVAIL_PHRASES = ["มีขายที่", "หาซื้อได้ที่", "available at", "sold at"]
 AVAIL_KEYWORDS = ["ขาย", "available", "sold", "จำหน่าย", "retail", "store", "ร้าน"]
+CURRENT_AVAIL_RE = re.compile(r"ทั่วประเทศ|nationwide|ทุกสาขา|all branches|in stock|พร้อมส่ง", re.I)
+PRICE_RE = CATEGORY_PATTERNS["price"]
 
 
 def parse_copy(copy_text, lang="th"):
-    """Split Spark output into (description, needs_confirmation).
+    """Split Spark output into (description, needs, diagnostic).
 
-    Pure function (no network) so it is unit-testable. If the model
-    omits the NEEDS_CONFIRMATION marker, the whole text is kept as the
-    description and a fallback warning is added — never silently
-    shipped as verified, never crashed.
+    FAIL-CLOSED (GPT review issue 1): if the NEEDS_CONFIRMATION
+    marker is missing, the raw text is NOT trusted as listing copy.
+    Description falls back to the minimal safe line; the raw output
+    is returned only as a diagnostic (never rendered as listing
+    copy by the UI). Empty model output behaves the same way.
     """
     lang = lang if lang in FALLBACK_NEEDS else "th"
     lines = (copy_text or "").splitlines()
@@ -104,46 +124,70 @@ def parse_copy(copy_text, lang="th"):
             marker_idx = i
             break
     if marker_idx is None:
-        desc = (copy_text or "").strip()
-        needs = [FALLBACK_NEEDS[lang]]
-    else:
-        desc = "\n".join(lines[:marker_idx]).strip()
-        needs = [ln.strip()[1:].strip() for ln in lines[marker_idx + 1:]
-                 if ln.strip().startswith("-") and ln.strip()[1:].strip()]
+        diagnostic = (copy_text or "").strip() or "empty model output"
+        return MIN_DESC[lang], [FALLBACK_NEEDS[lang]], diagnostic
+    desc = "\n".join(lines[:marker_idx]).strip()
+    needs = [ln.strip()[1:].strip() for ln in lines[marker_idx + 1:]
+             if ln.strip().startswith("-") and ln.strip()[1:].strip()]
     if not desc:
         desc = MIN_DESC[lang]
         if not needs:
             needs = [FALLBACK_NEEDS[lang]]
-    return desc, needs
+    return desc, needs, None
 
 
-def check_claims(description, seller_facts, lang="th"):
-    """Deterministic post-checks on the description (pure, testable).
+def _split_units(text):
+    """Split a description into sentence-ish units (title line + sentences)."""
+    units = []
+    for block in (text or "").split("\n"):
+        block = block.strip()
+        if not block:
+            continue
+        units.extend(u.strip() for u in re.split(r"(?<=[.!?])\s+", block) if u.strip())
+    return units
 
-    Flags, never silently deletes: a flagged claim stays visible in
-    the description but is also listed under needs_confirmation, so
-    the seller verifies before publishing.
+
+def enforce_claims(description, seller_facts, lang="th"):
+    """Fail-closed claim enforcement (replaces flag-only check_claims).
+
+    Returns (safe_description, removed_needs). A sentence unit that
+    makes a claim in an enforced category WITHOUT a matching seller
+    fact is REMOVED from the description and quoted in removed_needs
+    as a diagnostic (labelled removed, not listing copy). Seller
+    facts exempt their category, EXCEPT current-availability wording,
+    which is never exempt: naming a retailer is not proof of current
+    stock. Subjective puffery (tasty, easy to carry) is not a factual
+    category and is left to the prompt + needs section — documented
+    limitation, not a claim of full enforcement.
     """
     lang = lang if lang in FALLBACK_NEEDS else "th"
     seller = (seller_facts or "").lower()
-    needs = []
-    price_supplied = any(t in seller for t in ["฿", "$", "บาท", "thb", "price", "ราคา"])
-    if PRICE_RE.search(description or "") and not price_supplied:
-        needs.append(NEEDS_PRICE[lang])
-    desc_lower = (description or "").lower()
-    avail_flagged = False
-    for retailer in RETAILER_TOKENS:
-        if retailer in desc_lower and retailer not in seller:
-            avail_flagged = True
-            break
-    if not avail_flagged:
-        for phrase in GENERIC_AVAIL_PHRASES:
-            if phrase in desc_lower and not any(k in seller for k in AVAIL_KEYWORDS):
-                avail_flagged = True
+    prefix = "ตัดออกเพื่อยืนยัน" if lang == "th" else "Removed for verification"
+    kept, removed = [], []
+    for unit in _split_units(description):
+        low = unit.lower()
+        hit = None
+        for cat, rx in CATEGORY_PATTERNS.items():
+            if rx.search(unit) and not any(k in seller for k in CATEGORY_SELLER_KEYS[cat]):
+                hit = cat
                 break
-    if avail_flagged:
-        needs.append(NEEDS_AVAIL[lang])
-    return needs
+        if hit is None:
+            if RETAILER_TOKENS and any(t in low for t in RETAILER_TOKENS) \
+                    and not any(t in seller for t in RETAILER_TOKENS):
+                hit = "availability"
+            elif any(ph in low for ph in GENERIC_AVAIL_PHRASES) \
+                    and not any(k in seller for k in AVAIL_KEYWORDS):
+                hit = "availability"
+        if hit is None and CURRENT_AVAIL_RE.search(unit):
+            hit = "current-availability"
+        if hit is not None:
+            removed.append(f"{prefix} ({hit}): {unit}")
+        else:
+            kept.append(unit)
+    safe = "\n".join(kept) if kept else MIN_DESC[lang]
+    return safe, removed
+
+
 EDIT_PROMPT = ("Place this exact product on a clean light-grey seamless studio background. "
                "Keep the product, its packaging, colors, label and all text exactly unchanged. "
                "Remove the background completely. Soft even studio lighting, "
@@ -195,10 +239,12 @@ def run_pipeline(img_bytes, lang="th", seller_facts=""):
         return {"ok": False, "error": "วาดรูปสตูดิโอไม่สำเร็จ"}
     prompt_text = COPY_PROMPT.get(lang, COPY_PROMPT["th"])
     if (seller_facts or "").strip():
-        prompt_text += ("\n\nSeller-provided facts (seller input, not image evidence):\n"
+        prompt_text += ("\n\nSeller-provided claims (NOT independently verified; "
+                        "a seller mention is not proof of current availability or stock):\n"
                         + seller_facts.strip())
     else:
         prompt_text += "\n\nSeller-provided facts: none."
+    prompt_text += "\n" + SELLER_NOTE.get(lang, SELLER_NOTE["th"])
     status, spark = call("POST", "/chat/completions", {
         "model": "muse-spark-1.3",
         "messages": [{"role": "user", "content": [
@@ -208,13 +254,16 @@ def run_pipeline(img_bytes, lang="th", seller_facts=""):
     copy_text = ""
     if status == 200:
         copy_text = spark["choices"][0]["message"]["content"] or ""
-    description, needs = parse_copy(copy_text, lang)
-    for extra in check_claims(description, seller_facts, lang):
-        if extra not in needs:
-            needs.append(extra)
+    description_raw, needs, diagnostic = parse_copy(copy_text, lang)
+    safe_desc, removed = enforce_claims(description_raw, seller_facts, lang)
+    for entry in removed:
+        if entry not in needs:
+            needs.append(entry)
     return {"ok": True, "concept": concept, "box": box,
-            "studio_b64": studio_b64, "copy": description,
-            "description": description, "needs_confirmation": needs}
+            "studio_b64": studio_b64, "copy": safe_desc,
+            "description": safe_desc, "needs_confirmation": needs,
+            "diagnostic_untrusted": diagnostic,
+            "seller_facts_used": bool((seller_facts or "").strip())}
 
 
 # Abuse guard for the public tunnel: the server spends the owner's Meta
