@@ -5,53 +5,95 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SnapSell AI — ถ่ายรูปเดียว ได้การ์ดลงขาย</title>
 <style>
-  :root { --ink:#1c2430; --muted:#66707e; --line:#e3e7ec; --accent:#0f7a5c; --accent-dark:#0b5c45; --bg:#f6f8f9; }
+  :root {
+    --bg:#0d0e12; --surface:#16171d; --surface2:#1d1f27; --line:#2a2d38;
+    --text:#f2f3f6; --muted:#a9b0bd; --muted2:#8b93a3;
+    --violet:#8b5cf6; --violet2:#7c3aed; --cyan:#22d3ee; --cyan2:#06b6d4;
+    --grad:linear-gradient(135deg,#8b5cf6,#22d3ee);
+    --danger:#fca5a5; --warn-bg:#2a2113; --warn-text:#fde68a; --amber:#fbbf24;
+  }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,"Noto Sans Thai",sans-serif; color:var(--ink); background:var(--bg); }
-  header { background:#101820; color:#fff; padding:26px 20px; }
-  .head-row { max-width:860px; margin:0 auto; display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
-  header h1 { margin:0 0 6px; font-size:26px; }
-  header p { margin:0; color:#b9c4cf; max-width:720px; line-height:1.6; }
-  .lang { display:flex; gap:0; border:1px solid #3a4754; border-radius:999px; overflow:hidden; flex-shrink:0; }
-  .lang button { background:transparent; color:#b9c4cf; border:0; padding:8px 14px; font-size:14px; cursor:pointer; }
-  .lang button.active { background:#fff; color:#101820; font-weight:bold; }
-  main { max-width:860px; margin:0 auto; padding:20px; }
-  .how { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; line-height:1.8; }
-  .how b { color:var(--accent); }
-  .upload { background:#fff; border:1px solid var(--line); border-radius:16px; padding:24px 22px; text-align:center; margin:20px 0; box-shadow:0 2px 12px rgba(16,24,32,.06); }
-  .upload h2 { margin:0 0 16px; font-size:21px; }
-  .dropzone { border:2px dashed #b9c4cf; border-radius:14px; padding:28px 16px; cursor:pointer; transition:border-color .15s, background .15s; }
-  .dropzone:hover, .dropzone.over { border-color:var(--accent); background:#f0faf6; }
+  body { margin:0; font-family:system-ui,"Noto Sans Thai",sans-serif; color:var(--text); background:var(--bg); line-height:1.7; }
+  body::before { content:""; position:fixed; inset:0 0 auto 0; height:420px; pointer-events:none;
+    background:radial-gradient(560px 260px at 18% 0%, rgba(139,92,246,.22), transparent 70%),
+               radial-gradient(560px 260px at 82% 0%, rgba(34,211,238,.14), transparent 70%); }
+  :focus-visible { outline:2px solid var(--cyan); outline-offset:2px; }
+  header { position:relative; padding:20px 20px 0; }
+  .topbar { max-width:1080px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .logo { font-size:20px; font-weight:800; letter-spacing:.2px; }
+  .logo span { color:var(--cyan); }
+  .lang { display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; flex-shrink:0; background:var(--surface); }
+  .lang button { background:transparent; color:var(--muted); border:0; padding:8px 16px; font-size:14px; cursor:pointer; }
+  .lang button.active { background:var(--text); color:#0d0e12; font-weight:bold; }
+  main { max-width:1080px; margin:0 auto; padding:20px; position:relative; }
+  .hero { padding:44px 0 28px; max-width:760px; }
+  .kicker { color:var(--cyan); font-size:13px; font-weight:700; letter-spacing:.14em; margin:0 0 14px; }
+  .hero h1 { margin:0 0 16px; font-size:clamp(34px,6vw,54px); line-height:1.15; font-weight:800;
+    background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero .tagline { color:var(--muted); font-size:18px; margin:0; }
+  .pipeline { margin:8px 0 32px; }
+  .pipeline h2, .gallery h2 { font-size:26px; margin:0 0 12px; }
+  .how { color:var(--muted); margin:0 0 20px; }
+  .how b { color:var(--cyan); }
+  .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .step { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px; }
+  .step-num { display:inline-block; font-weight:800; color:var(--violet); border:1px solid var(--line); border-radius:999px; padding:2px 12px; font-size:13px; margin-bottom:10px; }
+  .step h3 { margin:0 0 6px; font-size:18px; }
+  .step p { margin:0; color:var(--muted); font-size:15px; }
+  .upload { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:28px 24px; text-align:center; margin:0 0 36px; box-shadow:0 8px 32px rgba(0,0,0,.35); }
+  .upload h2 { margin:0 0 20px; font-size:24px; }
+  .dropzone { border:2px dashed #3d4356; border-radius:16px; padding:32px 16px; cursor:pointer; transition:border-color .18s, background .18s, box-shadow .18s; }
+  .dropzone:hover, .dropzone.over { border-color:var(--cyan); background:rgba(34,211,238,.06); box-shadow:0 0 0 4px rgba(34,211,238,.08); }
   .dropzone .icon { font-size:40px; }
-  .dropzone .dz-text { margin-top:8px; font-size:16px; }
+  .dropzone .dz-text { margin-top:8px; font-size:16px; font-weight:600; }
   .dropzone .dz-sub { margin-top:4px; font-size:13px; color:var(--muted); }
-  .file-chip { display:none; margin:14px auto 0; background:#f0faf6; border:1px solid #bfe3d6; color:#0b5c45; border-radius:999px; padding:6px 14px; font-size:14px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .preview { display:none; margin:18px auto 0; max-width:420px; }
+  .preview.show { display:block; }
+  .preview img { width:100%; max-height:260px; object-fit:cover; border-radius:12px; border:1px solid var(--line); display:block; }
+  .file-chip { display:none; margin:14px auto 0; background:rgba(139,92,246,.14); border:1px solid #3d3566; color:#c4b5fd; border-radius:999px; padding:6px 14px; font-size:14px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .file-chip.show { display:inline-block; }
-  .cta { background:var(--accent); color:#fff; border:0; border-radius:10px; padding:14px 28px; font-size:17px; font-weight:bold; cursor:pointer; margin-top:18px; width:100%; max-width:340px; }
-  .cta:hover { background:var(--accent-dark); }
-  .cta:disabled { opacity:.5; }
-  .upload .note { color:var(--muted); font-size:13px; margin-top:14px; line-height:1.6; }
+  .facts { text-align:left; margin-top:20px; }
+  .facts label { font-size:14px; font-weight:600; }
+  .facts textarea { width:100%; margin-top:8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font:inherit; font-size:15px; resize:vertical; }
+  .facts textarea:focus { border-color:var(--cyan); outline:none; box-shadow:0 0 0 3px rgba(34,211,238,.15); }
+  .cta { background:var(--grad); color:#fff; border:0; border-radius:12px; padding:14px 28px; font-size:17px; font-weight:bold; cursor:pointer; margin-top:20px; width:100%; max-width:340px; transition:transform .15s, box-shadow .15s, opacity .15s; }
+  .cta:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(124,58,237,.45); }
+  .cta:active { transform:translateY(0); }
+  .cta:disabled { opacity:.5; transform:none; box-shadow:none; }
+  .upload .note, .note { color:var(--muted); font-size:13px; margin-top:14px; line-height:1.6; }
   #status { margin-top:12px; color:var(--muted); min-height:20px; font-size:14px; }
-  .card { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; margin:20px 0; box-shadow:0 2px 12px rgba(16,24,32,.05); }
-  .card h2 { margin:0; padding:14px 16px 4px; font-size:19px; }
-  .card .detail { padding:0 16px 14px; line-height:1.7; color:#333; }
+  #status.error { color:var(--danger); }
+  .gallery-note { color:var(--muted); font-size:13px; margin:8px 0 16px; }
+  .gallery-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:20px; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:20px; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,.3); transition:border-color .18s, transform .18s; }
+  .card:hover { border-color:#3d4356; transform:translateY(-2px); }
+  .card h2 { margin:0; padding:16px 18px 6px; font-size:19px; }
+  .card .detail { padding:0 18px 14px; line-height:1.7; color:#e6e8ec; }
   .pair { display:grid; grid-template-columns:1fr 1fr; gap:0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
   .pair figure { margin:0; overflow:hidden; }
-  .pair img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
+  .pair img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; transition:transform .25s; }
+  .card:hover .pair img { transform:scale(1.03); }
   .pair figcaption { font-size:12px; color:var(--muted); padding:6px 10px; }
-  .meta { padding:10px 16px; font-size:13px; color:var(--muted); }
-  .price { color:#b45309; font-weight:bold; }
-  footer { text-align:center; color:var(--muted); font-size:13px; padding:20px; line-height:1.8; }
-  @media (max-width:600px) { .pair { grid-template-columns:1fr; } .head-row { flex-direction:column; } }
+  .meta { padding:12px 18px; font-size:13px; color:var(--muted); }
+  .price { color:var(--amber); font-weight:bold; }
+  footer { text-align:center; color:var(--muted); font-size:13px; padding:28px 20px 36px; line-height:1.8; }
+  @media (max-width:760px) {
+    .steps { grid-template-columns:1fr; }
+    .gallery-grid { grid-template-columns:1fr; }
+    .hero { padding-top:28px; }
+    .upload { padding:22px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition:none !important; }
+    .card:hover { transform:none; }
+    .card:hover .pair img { transform:none; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <div class="head-row">
-    <div>
-      <h1>SnapSell AI 📸</h1>
-      <p data-i18n="tagline">พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark</p>
-    </div>
+  <div class="topbar">
+    <div class="logo">SnapSell <span>AI</span></div>
     <div class="lang">
       <button id="btn-th" class="active" onclick="setLang('th')">ไทย</button>
       <button id="btn-en" onclick="setLang('en')">EN</button>
@@ -59,29 +101,47 @@
   </div>
 </header>
 <main>
-  <div class="how" data-i18n="how"></div>
+  <section class="hero">
+    <p class="kicker" data-i18n="heroKicker">META GLOBAL AI DEVELOPER HACKATHON 2026 · INDIE TRACK</p>
+    <h1 data-i18n="heroTitle">รูปเดียว ได้การ์ดลงขายพร้อมโพสต์</h1>
+    <p class="tagline" data-i18n="tagline">พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark</p>
+  </section>
 
-  <div class="upload">
+  <section class="pipeline">
+    <h2 data-i18n="pipeTitle">ระบบทำงาน 3 ขั้นในรูปเดียว</h2>
+    <div class="how" data-i18n="how"></div>
+    <div class="steps">
+      <div class="step"><span class="step-num">01</span><h3 data-i18n="step1Title">SAM 3.1 หาตัวสินค้า</h3><p data-i18n="step1Desc">แยกสินค้าออกจากพื้นหลังรกและมือที่บัง</p></div>
+      <div class="step"><span class="step-num">02</span><h3 data-i18n="step2Title">Muse Image วาดรูปสตูดิโอ</h3><p data-i18n="step2Desc">พื้นสะอาด แสงสวย แต่สินค้าและฉลากยังเป็นของจริง</p></div>
+      <div class="step"><span class="step-num">03</span><h3 data-i18n="step3Title">Muse Spark เขียนข้อความลงขาย</h3><p data-i18n="step3Desc">จากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น</p></div>
+    </div>
+  </section>
+
+  <section class="upload">
     <h2 data-i18n="uploadTitle">ลองของจริง — อัปโหลดรูปสินค้า</h2>
-    <div class="dropzone" id="dz" onclick="document.getElementById('photo').click()">
+    <div class="dropzone" id="dz" tabindex="0" role="button" onclick="document.getElementById('photo').click()">
       <div class="icon">📸</div>
       <div class="dz-text" data-i18n="dzText">ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์</div>
       <div class="dz-sub" data-i18n="dzSub">รองรับไฟล์รูป JPG / PNG</div>
     </div>
     <input type="file" id="photo" accept="image/*" hidden>
+    <figure class="preview" id="previewWrap"><img id="preview" alt=""></figure>
     <div class="file-chip" id="chip"></div>
-    <label for="facts" data-i18n="sellerFactsLabel"></label>
-    <textarea id="facts" rows="2" style="width:100%;margin-top:8px"></textarea>
-    <div class="note" data-i18n="sellerFactsNote"></div>
-    <br>
+    <div class="facts">
+      <label for="facts" data-i18n="sellerFactsLabel"></label>
+      <textarea id="facts" rows="2"></textarea>
+      <div class="note" data-i18n="sellerFactsNote"></div>
+    </div>
     <button class="cta" id="go" onclick="process()" data-i18n="cta">ทำเป็นการ์ดลงขาย</button>
-    <div id="status"></div>
+    <div id="status" role="status" aria-live="polite"></div>
     <div class="note" data-i18n="uploadNote">โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด</div>
-  </div>
+  </section>
   <div id="live"></div>
 
+  <section class="gallery">
   <h2 data-i18n="galleryTitle">การ์ดตัวอย่าง — ผลลัพธ์จริงทั้ง 5 ใบ</h2>
-    <div class="note" data-i18n="galleryNote" style="color:#66707e;font-size:13px;margin:8px 0 4px">การ์ดตัวอย่างเป็นผลลัพธ์จากระบบรุ่นก่อน guardrail ข้อความอ้างอิงจากฉลากที่เห็นในรูปต้นฉบับ</div>
+    <div class="gallery-note" data-i18n="galleryNote">การ์ดตัวอย่างเป็นผลลัพธ์จากระบบรุ่นก่อน guardrail ข้อความอ้างอิงจากฉลากที่เห็นในรูปต้นฉบับ</div>
+  <div class="gallery-grid">
 
   <article class="card">
     <h2 data-i18n="t1">คาลบี้ บันบัน ขนมถั่วลันเตาอบกรอบ รสดั้งเดิม ซองใหญ่</h2>
@@ -132,6 +192,8 @@
     <div class="detail" data-i18n="d5">น้ำดื่มบรรจุในขวดพลาสติกใส มีฝาปิดสีเขียวและฉลากสีเขียวพิมพ์โลโก้ 7 SELECT สภาพสินค้าตามที่เห็นในรูป เหมาะสำหรับพกพาดื่มระหว่างวัน</div>
     <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
   </article>
+  </div>
+  </section>
 </main>
 <footer data-i18n="footer">
   SnapSell AI — Meta Global AI Developer Hackathon 2026 (Indie track)<br>
@@ -170,7 +232,16 @@ galleryNote: 'การ์ดตัวอย่างเป็นผลลัพ
     sellerFactsLabel: 'ข้อมูลเพิ่มเติมจากผู้ขาย (ไม่บังคับ)',
     sellerFactsNote: 'ข้อมูลที่กรอกตรงนี้คือคำยืนยันจากผู้ขายเอง ไม่ใช่การตรวจสอบอิสระ — การระบุชื่อร้านไม่ได้พิสูจน์ว่าสินค้ามีพร้อมขายในปัจจุบัน',
     sellerNote: 'ข้อเท็จจริงบางส่วน (รวมถึงราคาหรือขนาดที่ตรงกับข้อมูลผู้ขาย) มาจากข้อมูลที่ผู้ขายกรอกเอง ไม่ใช่การตรวจสอบอิสระ — ค่าที่ตรงกันไม่ได้แปลว่าผ่านการตรวจสอบแล้ว',
-    factsPlaceholder: 'ข้อมูลเพิ่มเติมจากผู้ขาย (ไม่บังคับ) เช่น ราคา ขนาด — ระบบจะไม่แต่งข้อมูลที่ไม่มีหลักฐาน'
+    factsPlaceholder: 'ข้อมูลเพิ่มเติมจากผู้ขาย (ไม่บังคับ) เช่น ราคา ขนาด — ระบบจะไม่แต่งข้อมูลที่ไม่มีหลักฐาน',
+    heroKicker: 'เมตา โกลบอล เอไอ แฮกกาธอน 2026 · สายนักพัฒนาอิสระ',
+    heroTitle: 'รูปเดียว ได้การ์ดลงขายพร้อมโพสต์',
+    pipeTitle: 'ระบบทำงาน 3 ขั้นในรูปเดียว',
+    step1Title: 'SAM 3.1 หาตัวสินค้า',
+    step1Desc: 'แยกสินค้าออกจากพื้นหลังรกและมือที่บัง',
+    step2Title: 'Muse Image วาดรูปสตูดิโอ',
+    step2Desc: 'พื้นสะอาด แสงสวย แต่สินค้าและฉลากยังเป็นของจริง',
+    step3Title: 'Muse Spark เขียนข้อความลงขาย',
+    step3Desc: 'จากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น'
   },
   en: {
     tagline: 'Small sellers shoot product photos on their phones — messy, badly lit, a hand in the frame. SnapSell takes one photo and returns a ready-to-post listing card: a clean studio shot + title + description. Powered by SAM 3.1 → Muse Image → Muse Spark.',
@@ -203,7 +274,16 @@ galleryNote: 'Sample cards are outputs from the pre-guardrail system; claims quo
     sellerFactsLabel: 'Extra facts from the seller (optional)',
     sellerFactsNote: 'Facts entered here are the seller\'s own assertions, not independently verified — naming a retailer does not prove current availability.',
     sellerNote: 'Some facts shown (including any price or size matching seller input) come from seller-provided input, not independent verification — a match does not mean verified.',
-    factsPlaceholder: 'Extra facts from the seller (optional), e.g. price, size — nothing without evidence will be invented'
+    factsPlaceholder: 'Extra facts from the seller (optional), e.g. price, size — nothing without evidence will be invented',
+    heroKicker: 'META GLOBAL AI DEVELOPER HACKATHON 2026 · INDIE TRACK',
+    heroTitle: 'One photo. A listing ready to sell.',
+    pipeTitle: 'Three AI steps, one photo',
+    step1Title: 'SAM 3.1 finds the product',
+    step1Desc: 'Segments the product out of clutter and hands in the frame',
+    step2Title: 'Muse Image renders the studio shot',
+    step2Desc: 'Clean background, great light — the real product and label stay intact',
+    step3Title: 'Muse Spark writes the listing',
+    step3Desc: 'From what is actually visible — never inventing a price or unseen spec'
   }
 };
 let LANG = localStorage.getItem('snapsell-lang') || 'th';
@@ -228,12 +308,17 @@ const dz = document.getElementById('dz');
 const input = document.getElementById('photo');
 const chip = document.getElementById('chip');
 function showChip() {
-  if (input.files[0]) { chip.textContent = '📎 ' + input.files[0].name; chip.classList.add('show'); }
+  if (input.files[0]) {
+    chip.textContent = '📎 ' + input.files[0].name; chip.classList.add('show');
+    const pv = document.getElementById('preview');
+    if (pv) { pv.src = URL.createObjectURL(input.files[0]); document.getElementById('previewWrap').classList.add('show'); }
+  }
 }
 input.addEventListener('change', showChip);
 ['dragover', 'dragenter'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('over'); }));
 ['dragleave', 'drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('over'); }));
 dz.addEventListener('drop', ev => { if (ev.dataTransfer.files[0]) { input.files = ev.dataTransfer.files; showChip(); } });
+dz.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); input.click(); } });
 async function process() {
   const f = input.files[0];
   const st = document.getElementById('status');
@@ -241,6 +326,7 @@ async function process() {
   const T = I18N[LANG];
   if (!f) { st.textContent = T.noFile; return; }
   btn.disabled = true;
+  st.classList.remove('error');
   st.textContent = T.processing;
   const fd = new FormData();
   fd.append('photo', f);
@@ -249,7 +335,7 @@ async function process() {
   try {
     const r = await fetch(API_BASE + '/api/process', { method: 'POST', body: fd });
     const j = await r.json();
-    if (!j.ok) { st.textContent = T.fail + (j.error || ''); return; }
+    if (!j.ok) { st.textContent = T.fail + (j.error || ''); st.classList.add('error'); return; }
     const live = document.getElementById('live');
     live.replaceChildren();
     const art = document.createElement('article'); art.className = 'card';
@@ -268,7 +354,7 @@ async function process() {
     detail.style.whiteSpace = 'pre-line'; detail.textContent = j.copy; art.appendChild(detail);
     if (j.needs_confirmation && j.needs_confirmation.length) {
       const needs = document.createElement('div');
-      needs.style.cssText = 'background:#fff8e1;padding:10px 12px;border-radius:8px;margin-top:8px';
+      needs.style.cssText = 'background:#2a2113;color:#fde68a;padding:10px 12px;border-radius:8px;margin-top:8px';
       const b = document.createElement('b'); b.textContent = T.needsTitle; needs.appendChild(b);
       const ul = document.createElement('ul');
       j.needs_confirmation.forEach(n => { const li = document.createElement('li'); li.textContent = n; ul.appendChild(li); });
@@ -282,7 +368,7 @@ async function process() {
     art.appendChild(meta); live.appendChild(art);
     st.textContent = T.done;
   } catch (e) {
-    st.textContent = T.serverFail;
+    st.textContent = T.serverFail; st.classList.add('error');
   } finally {
     btn.disabled = false;
   }
