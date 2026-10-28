@@ -6,94 +6,109 @@
 <title>SnapSell AI — ถ่ายรูปเดียว ได้การ์ดลงขาย</title>
 <style>
   :root {
-    --bg:#0d0e12; --surface:#16171d; --surface2:#1d1f27; --line:#2a2d38;
-    --text:#f2f3f6; --muted:#a9b0bd; --muted2:#8b93a3;
-    --violet:#8b5cf6; --violet2:#7c3aed; --cyan:#22d3ee; --cyan2:#06b6d4;
-    --grad:linear-gradient(135deg,#8b5cf6,#22d3ee);
-    --danger:#fca5a5; --warn-bg:#2a2113; --warn-text:#fde68a; --amber:#fbbf24;
+    --paper:#faf7f1; --surface:#fffdf8; --ink:#211a13; --ink2:#3a322a;
+    --muted:#6f6558; --muted2:#8a7f71; --line:#e6ddcf; --line2:#d8cbb8;
+    --accent:#b23a12; --accent-dark:#932f0e; --accent-soft:#f7e8df;
+    --danger:#a81e1e; --price:#8a5a00;
+    --serif:Georgia,'Noto Serif Thai','TH Sarabun New','Times New Roman',serif;
+    --sans:system-ui,'Noto Sans Thai',sans-serif;
   }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,"Noto Sans Thai",sans-serif; color:var(--text); background:var(--bg); line-height:1.7; }
-  body::before { content:""; position:fixed; inset:0 0 auto 0; height:420px; pointer-events:none;
-    background:radial-gradient(560px 260px at 18% 0%, rgba(139,92,246,.22), transparent 70%),
-               radial-gradient(560px 260px at 82% 0%, rgba(34,211,238,.14), transparent 70%); }
-  :focus-visible { outline:2px solid var(--cyan); outline-offset:2px; }
-  header { position:relative; padding:20px 20px 0; }
-  .topbar { max-width:1080px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px; }
-  .logo { font-size:20px; font-weight:800; letter-spacing:.2px; }
-  .logo span { color:var(--cyan); }
-  .lang { display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; flex-shrink:0; background:var(--surface); }
+  html { scroll-behavior:smooth; }
+  body { margin:0; font-family:var(--sans); color:var(--ink); background:var(--paper); line-height:1.75; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  header { padding:22px 24px 0; }
+  .masthead { max-width:1160px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--line); }
+  .brand { font-family:var(--serif); font-size:26px; font-weight:700; letter-spacing:-.01em; }
+  .brand span { color:var(--accent); }
+  .lang { display:flex; border:1px solid var(--line2); border-radius:999px; overflow:hidden; flex-shrink:0; background:var(--surface); }
   .lang button { background:transparent; color:var(--muted); border:0; padding:8px 16px; font-size:14px; cursor:pointer; }
-  .lang button.active { background:var(--text); color:#0d0e12; font-weight:bold; }
-  main { max-width:1080px; margin:0 auto; padding:20px; position:relative; }
-  .hero { padding:44px 0 28px; max-width:760px; }
-  .kicker { color:var(--cyan); font-size:13px; font-weight:700; letter-spacing:.14em; margin:0 0 14px; }
-  .hero h1 { margin:0 0 16px; font-size:clamp(34px,6vw,54px); line-height:1.15; font-weight:800;
-    background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .hero .tagline { color:var(--muted); font-size:18px; margin:0; }
-  .pipeline { margin:8px 0 32px; }
-  .pipeline h2, .gallery h2 { font-size:26px; margin:0 0 12px; }
-  .how { color:var(--muted); margin:0 0 20px; }
-  .how b { color:var(--cyan); }
-  .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
-  .step { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px; }
-  .step-num { display:inline-block; font-weight:800; color:var(--violet); border:1px solid var(--line); border-radius:999px; padding:2px 12px; font-size:13px; margin-bottom:10px; }
-  .step h3 { margin:0 0 6px; font-size:18px; }
+  .lang button.active { background:var(--ink); color:var(--paper); font-weight:700; }
+  main { max-width:1160px; margin:0 auto; padding:0 24px; }
+  .hero { display:grid; grid-template-columns:1.02fr .98fr; gap:56px; align-items:center; padding:64px 0 60px; }
+  .kicker { color:var(--accent); font-size:12.5px; font-weight:700; letter-spacing:.16em; margin:0 0 18px; }
+  .hero h1 { font-family:var(--serif); margin:0 0 18px; font-size:clamp(42px,5.2vw,68px); line-height:1.1; letter-spacing:-.01em; }
+  .hero .tagline { color:var(--muted); font-size:18px; margin:0 0 28px; max-width:560px; }
+  .hero-cta { display:flex; gap:12px; flex-wrap:wrap; }
+  .btn-primary { display:inline-block; background:var(--accent); color:#fff; text-decoration:none; font-weight:700; font-size:16px; padding:13px 24px; border-radius:8px; }
+  .btn-primary:hover { background:var(--accent-dark); }
+  .btn-ghost { display:inline-block; border:1px solid var(--line2); color:var(--ink); text-decoration:none; font-weight:600; font-size:16px; padding:13px 24px; border-radius:8px; background:var(--surface); }
+  .btn-ghost:hover { border-color:var(--ink); }
+  .showcase-pair { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--surface); }
+  .showcase-pair figure { margin:0; }
+  .showcase-pair figure + figure { border-left:1px solid var(--line); }
+  .showcase-pair img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
+  .showcase-pair figcaption { font-size:12.5px; color:var(--muted); padding:8px 12px; }
+  .pipeline { border-top:1px solid var(--line); padding-top:56px; margin-top:4px; }
+  .pipeline h2, .gallery h2, .upload h2 { font-family:var(--serif); font-size:32px; margin:0 0 14px; letter-spacing:-.01em; }
+  .how { color:var(--muted); margin:0 0 28px; font-size:15.5px; max-width:760px; }
+  .how b { color:var(--accent); }
+  .process { display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--line); }
+  .process .step { padding:22px 24px 4px 0; }
+  .process .step + .step { border-left:1px solid var(--line); padding-left:24px; }
+  .step-num { display:block; font-family:var(--serif); font-size:30px; color:var(--accent); margin-bottom:6px; }
+  .step h3 { margin:0 0 6px; font-size:17px; }
   .step p { margin:0; color:var(--muted); font-size:15px; }
-  .upload { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:28px 24px; text-align:center; margin:0 0 36px; box-shadow:0 8px 32px rgba(0,0,0,.35); }
-  .upload h2 { margin:0 0 20px; font-size:24px; }
-  .dropzone { border:2px dashed #3d4356; border-radius:16px; padding:32px 16px; cursor:pointer; transition:border-color .18s, background .18s, box-shadow .18s; }
-  .dropzone:hover, .dropzone.over { border-color:var(--cyan); background:rgba(34,211,238,.06); box-shadow:0 0 0 4px rgba(34,211,238,.08); }
-  .dropzone .icon { font-size:40px; }
-  .dropzone .dz-text { margin-top:8px; font-size:16px; font-weight:600; }
+  .upload { border-top:1px solid var(--line); padding-top:56px; margin-top:56px; }
+  .bench { display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:start; margin-top:8px; }
+  .dropzone { border:1.5px dashed #c9bba6; border-radius:12px; padding:36px 16px; cursor:pointer; text-align:center; background:var(--surface); transition:border-color .18s, background .18s; }
+  .dropzone:hover, .dropzone.over { border-color:var(--accent); background:var(--accent-soft); }
+  .dropzone .icon { color:var(--ink); line-height:0; }
+  .dropzone .icon svg { width:44px; height:44px; }
+  .dropzone .dz-text { margin-top:12px; font-size:16px; font-weight:600; }
   .dropzone .dz-sub { margin-top:4px; font-size:13px; color:var(--muted); }
   .preview { display:none; margin:18px auto 0; max-width:420px; }
   .preview.show { display:block; }
-  .preview img { width:100%; max-height:260px; object-fit:cover; border-radius:12px; border:1px solid var(--line); display:block; }
-  .file-chip { display:none; margin:14px auto 0; background:rgba(139,92,246,.14); border:1px solid #3d3566; color:#c4b5fd; border-radius:999px; padding:6px 14px; font-size:14px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .preview img { width:100%; max-height:260px; object-fit:cover; border-radius:10px; border:1px solid var(--line); display:block; }
+  .file-chip { display:none; margin:14px auto 0; background:var(--accent-soft); border:1px solid #e8c9b8; color:#7a2c0c; border-radius:999px; padding:6px 14px; font-size:14px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .file-chip.show { display:inline-block; }
-  .facts { text-align:left; margin-top:20px; }
   .facts label { font-size:14px; font-weight:600; }
-  .facts textarea { width:100%; margin-top:8px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font:inherit; font-size:15px; resize:vertical; }
-  .facts textarea:focus { border-color:var(--cyan); outline:none; box-shadow:0 0 0 3px rgba(34,211,238,.15); }
-  .cta { background:var(--grad); color:#fff; border:0; border-radius:12px; padding:14px 28px; font-size:17px; font-weight:bold; cursor:pointer; margin-top:20px; width:100%; max-width:340px; transition:transform .15s, box-shadow .15s, opacity .15s; }
-  .cta:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(124,58,237,.45); }
-  .cta:active { transform:translateY(0); }
-  .cta:disabled { opacity:.5; transform:none; box-shadow:none; }
+  .facts textarea { width:100%; margin-top:8px; background:var(--surface); color:var(--ink); border:1px solid var(--line2); border-radius:10px; padding:12px 14px; font:inherit; font-size:15px; resize:vertical; }
+  .facts textarea:focus { border-color:var(--accent); outline:none; box-shadow:0 0 0 3px rgba(178,58,18,.12); }
+  .cta { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:14px 28px; font-size:17px; font-weight:700; cursor:pointer; margin-top:20px; width:100%; max-width:340px; transition:background .15s, opacity .15s; }
+  .cta:hover { background:var(--accent-dark); }
+  .cta:disabled { opacity:.5; }
   .upload .note, .note { color:var(--muted); font-size:13px; margin-top:14px; line-height:1.6; }
   #status { margin-top:12px; color:var(--muted); min-height:20px; font-size:14px; }
   #status.error { color:var(--danger); }
-  .gallery-note { color:var(--muted); font-size:13px; margin:8px 0 16px; }
-  .gallery-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:20px; }
-  .card { background:var(--surface); border:1px solid var(--line); border-radius:20px; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,.3); transition:border-color .18s, transform .18s; }
-  .card:hover { border-color:#3d4356; transform:translateY(-2px); }
-  .card h2 { margin:0; padding:16px 18px 6px; font-size:19px; }
-  .card .detail { padding:0 18px 14px; line-height:1.7; color:#e6e8ec; }
-  .pair { display:grid; grid-template-columns:1fr 1fr; gap:0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .gallery { border-top:1px solid var(--line); padding-top:56px; margin-top:56px; }
+  .gallery-note { color:var(--muted); font-size:13px; margin:0 0 24px; }
+  .gallery-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:20px; }
+  .gallery-grid .card:nth-child(1), .gallery-grid .card:nth-child(2) { grid-column:span 3; }
+  .gallery-grid .card:nth-child(3), .gallery-grid .card:nth-child(4), .gallery-grid .card:nth-child(5) { grid-column:span 2; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .card:hover { border-color:var(--line2); }
+  .card h2 { font-family:var(--serif); margin:0; padding:16px 18px 6px; font-size:20px; line-height:1.35; }
+  .card .detail { padding:0 18px 14px; line-height:1.7; color:var(--ink2); font-size:15px; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
   .pair figure { margin:0; overflow:hidden; }
-  .pair img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; transition:transform .25s; }
-  .card:hover .pair img { transform:scale(1.03); }
+  .pair img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
   .pair figcaption { font-size:12px; color:var(--muted); padding:6px 10px; }
   .meta { padding:12px 18px; font-size:13px; color:var(--muted); }
-  .price { color:var(--amber); font-weight:bold; }
-  footer { text-align:center; color:var(--muted); font-size:13px; padding:28px 20px 36px; line-height:1.8; }
+  .price { color:var(--price); font-weight:700; }
+  footer { text-align:center; color:var(--muted); font-size:13px; padding:32px 20px 40px; line-height:1.8; border-top:1px solid var(--line); margin-top:56px; }
+  @media (max-width:960px) {
+    .hero { grid-template-columns:1fr; gap:32px; padding-top:44px; }
+    .bench { grid-template-columns:1fr; gap:24px; }
+  }
   @media (max-width:760px) {
-    .steps { grid-template-columns:1fr; }
-    .gallery-grid { grid-template-columns:1fr; }
-    .hero { padding-top:28px; }
-    .upload { padding:22px 16px; }
+    .process { grid-template-columns:1fr; }
+    .process .step { padding:18px 0 4px; }
+    .process .step + .step { border-left:0; border-top:1px solid var(--line); padding-left:0; padding-top:18px; }
+    .gallery-grid .card { grid-column:span 6 !important; }
+    main { padding:0 16px; }
+    header { padding:22px 16px 0; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition:none !important; }
-    .card:hover { transform:none; }
-    .card:hover .pair img { transform:none; }
+    html { scroll-behavior:auto; }
   }
 </style>
 </head>
 <body>
 <header>
-  <div class="topbar">
-    <div class="logo">SnapSell <span>AI</span></div>
+  <div class="masthead">
+    <div class="brand">SnapSell <span>AI</span></div>
     <div class="lang">
       <button id="btn-th" class="active" onclick="setLang('th')">ไทย</button>
       <button id="btn-en" onclick="setLang('en')">EN</button>
@@ -102,43 +117,61 @@
 </header>
 <main>
   <section class="hero">
-    <p class="kicker" data-i18n="heroKicker">META GLOBAL AI DEVELOPER HACKATHON 2026 · INDIE TRACK</p>
-    <h1 data-i18n="heroTitle">รูปเดียว ได้การ์ดลงขายพร้อมโพสต์</h1>
-    <p class="tagline" data-i18n="tagline">พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark</p>
+    <div class="hero-copy">
+      <p class="kicker" data-i18n="heroKicker">META GLOBAL AI DEVELOPER HACKATHON 2026 · INDIE TRACK</p>
+      <h1 data-i18n="heroTitle">รูปเดียว ได้การ์ดลงขายพร้อมโพสต์</h1>
+      <p class="tagline" data-i18n="tagline">พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark</p>
+      <div class="hero-cta">
+        <a class="btn-primary" href="#upload" data-i18n="heroCtaTry">ลองอัปโหลดรูปเลย</a>
+        <a class="btn-ghost" href="#gallery" data-i18n="heroCtaSee">ดูผลลัพธ์จริง 5 ใบ</a>
+      </div>
+    </div>
+    <div class="showcase">
+      <div class="showcase-pair">
+        <figure><img src="assets/before3.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
+        <figure><img src="assets/after3.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+      </div>
+    </div>
   </section>
 
   <section class="pipeline">
     <h2 data-i18n="pipeTitle">ระบบทำงาน 3 ขั้นในรูปเดียว</h2>
     <div class="how" data-i18n="how"></div>
-    <div class="steps">
+    <div class="process">
       <div class="step"><span class="step-num">01</span><h3 data-i18n="step1Title">SAM 3.1 หาตัวสินค้า</h3><p data-i18n="step1Desc">แยกสินค้าออกจากพื้นหลังรกและมือที่บัง</p></div>
       <div class="step"><span class="step-num">02</span><h3 data-i18n="step2Title">Muse Image วาดรูปสตูดิโอ</h3><p data-i18n="step2Desc">พื้นสะอาด แสงสวย แต่สินค้าและฉลากยังเป็นของจริง</p></div>
       <div class="step"><span class="step-num">03</span><h3 data-i18n="step3Title">Muse Spark เขียนข้อความลงขาย</h3><p data-i18n="step3Desc">จากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น</p></div>
     </div>
   </section>
 
-  <section class="upload">
+  <section class="upload" id="upload">
     <h2 data-i18n="uploadTitle">ลองของจริง — อัปโหลดรูปสินค้า</h2>
-    <div class="dropzone" id="dz" tabindex="0" role="button" onclick="document.getElementById('photo').click()">
-      <div class="icon">📸</div>
-      <div class="dz-text" data-i18n="dzText">ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์</div>
-      <div class="dz-sub" data-i18n="dzSub">รองรับไฟล์รูป JPG / PNG</div>
+    <div class="bench">
+      <div class="bench-drop">
+        <div class="dropzone" id="dz" tabindex="0" role="button" onclick="document.getElementById('photo').click()">
+          <div class="icon"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4V8z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+          <div class="dz-text" data-i18n="dzText">ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์</div>
+          <div class="dz-sub" data-i18n="dzSub">รองรับไฟล์รูป JPG / PNG</div>
+        </div>
+        <input type="file" id="photo" accept="image/*" hidden>
+        <figure class="preview" id="previewWrap"><img id="preview" alt=""></figure>
+        <div class="file-chip" id="chip"></div>
+      </div>
+      <div class="bench-form">
+        <div class="facts">
+          <label for="facts" data-i18n="sellerFactsLabel"></label>
+          <textarea id="facts" rows="2"></textarea>
+          <div class="note" data-i18n="sellerFactsNote"></div>
+        </div>
+        <button class="cta" id="go" onclick="process()" data-i18n="cta">ทำเป็นการ์ดลงขาย</button>
+        <div id="status" role="status" aria-live="polite"></div>
+        <div class="note" data-i18n="uploadNote">โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด</div>
+      </div>
     </div>
-    <input type="file" id="photo" accept="image/*" hidden>
-    <figure class="preview" id="previewWrap"><img id="preview" alt=""></figure>
-    <div class="file-chip" id="chip"></div>
-    <div class="facts">
-      <label for="facts" data-i18n="sellerFactsLabel"></label>
-      <textarea id="facts" rows="2"></textarea>
-      <div class="note" data-i18n="sellerFactsNote"></div>
-    </div>
-    <button class="cta" id="go" onclick="process()" data-i18n="cta">ทำเป็นการ์ดลงขาย</button>
-    <div id="status" role="status" aria-live="polite"></div>
-    <div class="note" data-i18n="uploadNote">โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด</div>
   </section>
   <div id="live"></div>
 
-  <section class="gallery">
+  <section class="gallery" id="gallery">
   <h2 data-i18n="galleryTitle">การ์ดตัวอย่าง — ผลลัพธ์จริงทั้ง 5 ใบ</h2>
     <div class="gallery-note" data-i18n="galleryNote">การ์ดตัวอย่างเป็นผลลัพธ์จากระบบรุ่นก่อน guardrail ข้อความอ้างอิงจากฉลากที่เห็นในรูปต้นฉบับ</div>
   <div class="gallery-grid">
@@ -241,7 +274,9 @@ galleryNote: 'การ์ดตัวอย่างเป็นผลลัพ
     step2Title: 'Muse Image วาดรูปสตูดิโอ',
     step2Desc: 'พื้นสะอาด แสงสวย แต่สินค้าและฉลากยังเป็นของจริง',
     step3Title: 'Muse Spark เขียนข้อความลงขาย',
-    step3Desc: 'จากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น'
+    step3Desc: 'จากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น',
+    heroCtaTry: 'ลองอัปโหลดรูปเลย',
+    heroCtaSee: 'ดูผลลัพธ์จริง 5 ใบ'
   },
   en: {
     tagline: 'Small sellers shoot product photos on their phones — messy, badly lit, a hand in the frame. SnapSell takes one photo and returns a ready-to-post listing card: a clean studio shot + title + description. Powered by SAM 3.1 → Muse Image → Muse Spark.',
@@ -283,7 +318,9 @@ galleryNote: 'Sample cards are outputs from the pre-guardrail system; claims quo
     step2Title: 'Muse Image renders the studio shot',
     step2Desc: 'Clean background, great light — the real product and label stay intact',
     step3Title: 'Muse Spark writes the listing',
-    step3Desc: 'From what is actually visible — never inventing a price or unseen spec'
+    step3Desc: 'From what is actually visible — never inventing a price or unseen spec',
+    heroCtaTry: 'Try an upload',
+    heroCtaSee: 'See 5 real results'
   }
 };
 let LANG = localStorage.getItem('snapsell-lang') || 'th';
@@ -310,7 +347,7 @@ const chip = document.getElementById('chip');
 let prevPreviewURL = null;
 function showChip() {
   if (input.files[0]) {
-    chip.textContent = '📎 ' + input.files[0].name; chip.classList.add('show');
+    chip.textContent = input.files[0].name; chip.classList.add('show');
     const pv = document.getElementById('preview');
     if (pv) {
       const next = URL.createObjectURL(input.files[0]);
@@ -362,7 +399,7 @@ async function process() {
     detail.style.whiteSpace = 'pre-line'; detail.textContent = j.copy; art.appendChild(detail);
     if (j.needs_confirmation && j.needs_confirmation.length) {
       const needs = document.createElement('div');
-      needs.style.cssText = 'background:#2a2113;color:#fde68a;padding:10px 12px;border-radius:8px;margin-top:8px';
+      needs.style.cssText = 'background:#fdf3e3;color:#6b3d00;padding:10px 12px;border-radius:8px;margin-top:8px';
       const b = document.createElement('b'); b.textContent = T.needsTitle; needs.appendChild(b);
       const ul = document.createElement('ul');
       j.needs_confirmation.forEach(n => { const li = document.createElement('li'); li.textContent = n; ul.appendChild(li); });
