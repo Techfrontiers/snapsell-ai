@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "payload": {
+    "id": "chatcmpl-01a17aef-5f27-7134-a13e-94ba3a4f4aa5",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "**ชื่อสินค้า:**\nโกปิโก้ ลัคกี้เดย์ กาแฟ เข้ม หวานมัน ขวดพลาสติกฝาดำ\n\n**รายละเอียด:**\nเครื่องดื่มกาแฟบรรจุในขวดพลาสติกขนาดพกพา ฝาปิดเกลียวสีดำตามในรูป ฉลากขวดสีน้ำตาลระบุว่าเป็นรสกาแฟเข้มหวานมัน สินค้าตรงตามที่เห็นในภาพ",
+          "refusal": null,
+          "role": "assistant"
+        },
+        "logprobs": null
+      }
+    ],
+    "created": 1793063870,
+    "model": "muse-spark-1.3",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 1432,
+      "prompt_tokens": 2475,
+      "total_tokens": 3907,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1325
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  }
+}

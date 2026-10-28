@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "payload": {
+    "id": "chatcmpl-01a17aef-cb30-77cf-a6e4-4544940f36a7",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "**ชื่อสินค้า:** น้ำดื่ม 7 Select ขวดพลาสติกใส ฝาเขียว ฉลากเขียว\n\n**รายละเอียด:** น้ำดื่มบรรจุในขวดพลาสติกใส มีฝาปิดสีเขียวและฉลากสีเขียวพิมพ์โลโก้ 7 SELECT. สภาพสินค้าตามที่เห็นในรูป เหมาะสำหรับพกพาดื่มระหว่างวัน.",
+          "refusal": null,
+          "role": "assistant"
+        },
+        "logprobs": null
+      }
+    ],
+    "created": 1793063897,
+    "model": "muse-spark-1.3",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 952,
+      "prompt_tokens": 2475,
+      "total_tokens": 3427,
+      "completion_tokens_details": {
+        "reasoning_tokens": 852
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  }
+}

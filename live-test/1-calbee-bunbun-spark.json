@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "payload": {
+    "id": "chatcmpl-01a17aee-ff99-741d-b400-1a55e6ec36b9",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "คาลบี้ บันบัน ขนมถั่วลันเตาอบกรอบ รสดั้งเดิม ซองใหญ่\nขนมถั่วลันเตาอบกรอบแบรนด์ Calbee BunBun รสดั้งเดิม ถุงสีเขียวตามในรูป มีลายตัวการ์ตูนถั่วลันเตาอยู่ด้านหน้า. เป็นขนาดซองใหญ่ตามที่ระบุไว้บนบรรจุภัณฑ์.",
+          "refusal": null,
+          "role": "assistant"
+        },
+        "logprobs": null
+      }
+    ],
+    "created": 1793063845,
+    "model": "muse-spark-1.3",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 1278,
+      "prompt_tokens": 2475,
+      "total_tokens": 3753,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1180
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  }
+}
