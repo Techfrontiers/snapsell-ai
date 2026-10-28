@@ -70,6 +70,9 @@
     </div>
     <input type="file" id="photo" accept="image/*" hidden>
     <div class="file-chip" id="chip"></div>
+    <label for="facts" data-i18n="sellerFactsLabel"></label>
+    <textarea id="facts" rows="2" style="width:100%;margin-top:8px"></textarea>
+    <div class="note" data-i18n="sellerFactsNote"></div>
     <br>
     <button class="cta" id="go" onclick="process()" data-i18n="cta">ทำเป็นการ์ดลงขาย</button>
     <div id="status"></div>
@@ -160,7 +163,12 @@ const I18N = {
     noFile: 'เลือกรูปก่อนนะ', processing: 'กำลังตัดรูปสินค้า… วาดรูปสตูดิโอ… เขียนแคปชัน… รอสักครู่',
     fail: 'ทำไม่สำเร็จ: ', serverFail: 'ต่อเซิร์ฟเวอร์เดโมไม่ได้ — เปิดผ่าน python3 server.py แล้วลองใหม่ (การ์ดตัวอย่างข้างล่างยังดูได้ปกติ)',
     done: 'เสร็จแล้ว — การ์ดอยู่ด้านบน', yourCard: 'การ์ดของคุณ',
-    liveBefore: 'ก่อน — รูปที่อัปโหลด', liveAfter: 'หลัง — รูปสตูดิโอ', foundWith: 'SAM เจอสินค้าด้วยคำว่า '
+    liveBefore: 'ก่อน — รูปที่อัปโหลด', liveAfter: 'หลัง — รูปสตูดิโอ', foundWith: 'SAM เจอสินค้าด้วยคำว่า ',
+    needsTitle: 'ต้องยืนยันก่อนลงขาย',
+    sellerFactsLabel: 'ข้อมูลเพิ่มเติมจากผู้ขาย (ไม่บังคับ)',
+    sellerFactsNote: 'ข้อมูลที่กรอกตรงนี้คือคำยืนยันจากผู้ขายเอง ไม่ใช่การตรวจสอบอิสระ — การระบุชื่อร้านไม่ได้พิสูจน์ว่าสินค้ามีพร้อมขายในปัจจุบัน',
+    sellerNote: 'ข้อเท็จจริงบางส่วน (รวมถึงราคาหรือขนาดที่ตรงกับข้อมูลผู้ขาย) มาจากข้อมูลที่ผู้ขายกรอกเอง ไม่ใช่การตรวจสอบอิสระ — ค่าที่ตรงกันไม่ได้แปลว่าผ่านการตรวจสอบแล้ว',
+    factsPlaceholder: 'ข้อมูลเพิ่มเติมจากผู้ขาย (ไม่บังคับ) เช่น ราคา ขนาด — ระบบจะไม่แต่งข้อมูลที่ไม่มีหลักฐาน'
   },
   en: {
     tagline: 'Small sellers shoot product photos on their phones — messy, badly lit, a hand in the frame. SnapSell takes one photo and returns a ready-to-post listing card: a clean studio shot + title + description. Powered by SAM 3.1 → Muse Image → Muse Spark.',
@@ -187,13 +195,19 @@ const I18N = {
     noFile: 'Pick a photo first', processing: 'Segmenting the product… rendering the studio shot… writing the copy… one moment',
     fail: 'Failed: ', serverFail: 'Could not reach the demo server — run it with python3 server.py and try again (the sample cards below still work fine)',
     done: 'Done — your card is above', yourCard: 'Your card',
-    liveBefore: 'Before — your upload', liveAfter: 'After — studio shot', foundWith: 'SAM found the product as '
+    liveBefore: 'Before — your upload', liveAfter: 'After — studio shot', foundWith: 'SAM found the product as ',
+    needsTitle: 'Needs confirmation before listing',
+    sellerFactsLabel: 'Extra facts from the seller (optional)',
+    sellerFactsNote: 'Facts entered here are the seller\'s own assertions, not independently verified — naming a retailer does not prove current availability.',
+    sellerNote: 'Some facts shown (including any price or size matching seller input) come from seller-provided input, not independent verification — a match does not mean verified.',
+    factsPlaceholder: 'Extra facts from the seller (optional), e.g. price, size — nothing without evidence will be invented'
   }
 };
 let LANG = localStorage.getItem('snapsell-lang') || 'th';
 // API base for the live pipeline. Empty = same origin (local server.py).
 // The Pages deploy replaces __SNAPSELL_API_BASE__ with the public tunnel URL.
 const API_BASE = '__SNAPSELL_API_BASE__';
+function setFactsPlaceholder() { const el = document.getElementById('facts'); if (el) el.placeholder = I18N[LANG].factsPlaceholder || ''; }
 function setLang(l) {
   LANG = l;
   localStorage.setItem('snapsell-lang', l);
@@ -204,8 +218,9 @@ function setLang(l) {
     const v = I18N[l][el.dataset.i18n];
     if (v !== undefined) el.innerHTML = v;
   });
+  setFactsPlaceholder();
 }
-setLang(LANG);
+setLang(LANG); setFactsPlaceholder();
 const dz = document.getElementById('dz');
 const input = document.getElementById('photo');
 const chip = document.getElementById('chip');
@@ -227,17 +242,41 @@ async function process() {
   const fd = new FormData();
   fd.append('photo', f);
   fd.append('lang', LANG);
+  fd.append('facts', document.getElementById('facts').value || '');
   try {
     const r = await fetch(API_BASE + '/api/process', { method: 'POST', body: fd });
     const j = await r.json();
     if (!j.ok) { st.textContent = T.fail + (j.error || ''); return; }
-    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\*\*/g, '').replace(/\n/g, '<br>');
-    document.getElementById('live').innerHTML =
-      '<article class="card"><h2>' + T.yourCard + '</h2>' +
-      '<div class="pair"><figure><img src="' + URL.createObjectURL(f) + '"><figcaption>' + T.liveBefore + '</figcaption></figure>' +
-      '<figure><img src="data:image/png;base64,' + j.studio_b64 + '"><figcaption>' + T.liveAfter + '</figcaption></figure></div>' +
-      '<div class="detail">' + esc(j.copy) + '</div>' +
-      '<div class="meta">' + T.priceLabel + ' <span class="price">' + T.priceSoon + '</span> · ' + T.foundWith + esc(j.concept) + '</div></article>';
+    const live = document.getElementById('live');
+    live.replaceChildren();
+    const art = document.createElement('article'); art.className = 'card';
+    const h2 = document.createElement('h2'); h2.textContent = T.yourCard; art.appendChild(h2);
+    const pair = document.createElement('div'); pair.className = 'pair';
+    const figB = document.createElement('figure');
+    const imgB = document.createElement('img'); imgB.src = URL.createObjectURL(f);
+    const capB = document.createElement('figcaption'); capB.textContent = T.liveBefore;
+    figB.appendChild(imgB); figB.appendChild(capB); pair.appendChild(figB);
+    const figA = document.createElement('figure');
+    const imgA = document.createElement('img'); imgA.src = 'data:image/png;base64,' + j.studio_b64;
+    const capA = document.createElement('figcaption'); capA.textContent = T.liveAfter;
+    figA.appendChild(imgA); figA.appendChild(capA); pair.appendChild(figA);
+    art.appendChild(pair);
+    const detail = document.createElement('div'); detail.className = 'detail';
+    detail.style.whiteSpace = 'pre-line'; detail.textContent = j.copy; art.appendChild(detail);
+    if (j.needs_confirmation && j.needs_confirmation.length) {
+      const needs = document.createElement('div');
+      needs.style.cssText = 'background:#fff8e1;padding:10px 12px;border-radius:8px;margin-top:8px';
+      const b = document.createElement('b'); b.textContent = T.needsTitle; needs.appendChild(b);
+      const ul = document.createElement('ul');
+      j.needs_confirmation.forEach(n => { const li = document.createElement('li'); li.textContent = n; ul.appendChild(li); });
+      needs.appendChild(ul); art.appendChild(needs);
+    }
+    if (j.seller_facts_used) {
+      const sn = document.createElement('div'); sn.className = 'note'; sn.textContent = T.sellerNote; art.appendChild(sn);
+    }
+    const meta = document.createElement('div'); meta.className = 'meta';
+    meta.textContent = T.priceLabel + ' ' + T.priceSoon + ' · ' + T.foundWith + j.concept;
+    art.appendChild(meta); live.appendChild(art);
     st.textContent = T.done;
   } catch (e) {
     st.textContent = T.serverFail;
