@@ -307,11 +307,19 @@ setLang(LANG); setFactsPlaceholder();
 const dz = document.getElementById('dz');
 const input = document.getElementById('photo');
 const chip = document.getElementById('chip');
+let prevPreviewURL = null;
 function showChip() {
   if (input.files[0]) {
     chip.textContent = '📎 ' + input.files[0].name; chip.classList.add('show');
     const pv = document.getElementById('preview');
-    if (pv) { pv.src = URL.createObjectURL(input.files[0]); document.getElementById('previewWrap').classList.add('show'); }
+    if (pv) {
+      const next = URL.createObjectURL(input.files[0]);
+      const old = prevPreviewURL;
+      pv.src = next;
+      prevPreviewURL = next;
+      if (old) URL.revokeObjectURL(old);
+      document.getElementById('previewWrap').classList.add('show');
+    }
   }
 }
 input.addEventListener('change', showChip);
