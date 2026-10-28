@@ -103,6 +103,67 @@ CATEGORY_SELLER_KEYS = {
 RETAILER_TOKENS = ["7-eleven", "เซเว่น"]
 GENERIC_AVAIL_PHRASES = ["มีขายที่", "หาซื้อได้ที่", "available at", "sold at"]
 AVAIL_KEYWORDS = ["ขาย", "available", "sold", "จำหน่าย", "retail", "store", "ร้าน"]
+# --- Value matching (GPT second-pass review) ---
+# Price/size claims are kept ONLY when every numeric value in the
+# sentence matches a seller-provided value (after unit conversion).
+# A same-category keyword is NOT enough: seller "35 baht / 120 g"
+# must NOT exempt model "999 baht / 500 g".
+def _num(text):
+    return round(float(text.replace(",", "")), 2)
+
+
+def extract_prices(text):
+    """All numeric prices in text (currency-marked only)."""
+    out = set()
+    for m in re.finditer(r"(?:฿|\$|THB)\s*(\d[\d,]*\.?\d*)", text or "", re.I):
+        out.add(_num(m.group(1)))
+    for m in re.finditer(r"(\d[\d,]*\.?\d*)\s*(?:บาท|baht|THB)", text or "", re.I):
+        out.add(_num(m.group(1)))
+    return out
+
+
+_SIZE_UNITS = [
+    # (alternatives, dimension, grams/ml/cm per unit) — longer forms first.
+    (r"กิโลกรัม|kg", "mass", 1000.0),
+    (r"กรัม|\bg\b", "mass", 1.0),
+    (r"มิลลิลิตร|ml", "volume", 1.0),
+    (r"ลิตร", "volume", 1000.0),
+    (r"ซม\.?|cm", "length", 1.0),
+    (r"มม\.?|mm", "length", 0.1),
+]
+
+
+def extract_sizes(text):
+    """All (dimension, canonical value) size pairs in text."""
+    out = set()
+    for alts, dim, factor in _SIZE_UNITS:
+        for m in re.finditer(r"(\d[\d,]*\.?\d*)\s*(?:" + alts + r")",
+                             text or "", re.I):
+            out.add((dim, round(_num(m.group(1)) * factor, 2)))
+    return out
+
+
+# Health-benefit claims are NEVER seller-exempt: a seller asserting a
+# cure does not verify it. Narrow list on purpose (see LIMITATIONS).
+HEALTH_BENEFIT_RE = re.compile(
+    r"cure|cures|treats|heals|รักษาโรค|บรรเทาอาการ|ป้องกันโรค|"
+    r"เสริมภูมิคุ้มกัน|detox|ล้างพิษ", re.I)
+
+# LIMITATIONS (stated plainly, GPT second-pass review item 3):
+# - Regex catches listed keywords/patterns only. Paraphrases,
+#   misspellings, Thai phrasing variants, implied claims
+#   ("feel fresh all day"), and claims split across sentences
+#   are NOT caught.
+# - Value matching covers NUMERIC prices and MEASURED sizes only.
+#   Non-numeric price mentions, vague sizes ("big bag"), flavor,
+#   variant, and subjective puffery are NOT value-checked.
+# - Nutrition/certification/compatibility exemptions are still
+#   keyword-based (not value-verified) — only price and size
+#   got value matching in this round.
+# - A seller-value match proves CONSISTENCY with seller input
+#   only, never independent truth. Matched values stay labelled
+#   as seller-provided, never as verified.
+
 CURRENT_AVAIL_RE = re.compile(r"ทั่วประเทศ|nationwide|ทุกสาขา|all branches|in stock|พร้อมส่ง", re.I)
 PRICE_RE = CATEGORY_PATTERNS["price"]
 
@@ -163,14 +224,35 @@ def enforce_claims(description, seller_facts, lang="th"):
     lang = lang if lang in FALLBACK_NEEDS else "th"
     seller = (seller_facts or "").lower()
     prefix = "ตัดออกเพื่อยืนยัน" if lang == "th" else "Removed for verification"
+    seller_prices = extract_prices(seller_facts)
+    seller_sizes = extract_sizes(seller_facts)
     kept, removed = [], []
     for unit in _split_units(description):
         low = unit.lower()
         hit = None
-        for cat, rx in CATEGORY_PATTERNS.items():
-            if rx.search(unit) and not any(k in seller for k in CATEGORY_SELLER_KEYS[cat]):
-                hit = cat
-                break
+        if HEALTH_BENEFIT_RE.search(unit):
+            hit = "health-benefit"
+        else:
+            prices = extract_prices(unit)
+            if prices:
+                if not seller_prices:
+                    hit = "price-unverified"
+                elif not prices.issubset(seller_prices):
+                    hit = "price-mismatch"
+            if hit is None:
+                sizes = extract_sizes(unit)
+                if sizes:
+                    if not seller_sizes:
+                        hit = "size-unverified"
+                    elif not sizes.issubset(seller_sizes):
+                        hit = "size-mismatch"
+        if hit is None:
+            for cat, rx in CATEGORY_PATTERNS.items():
+                if cat in ("price", "size"):
+                    continue
+                if rx.search(unit) and not any(k in seller for k in CATEGORY_SELLER_KEYS[cat]):
+                    hit = cat
+                    break
         if hit is None:
             if RETAILER_TOKENS and any(t in low for t in RETAILER_TOKENS) \
                     and not any(t in seller for t in RETAILER_TOKENS):
