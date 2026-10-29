@@ -4,18 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SnapSell AI — ถ่ายรูปเดียว ได้การ์ดลงขาย</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  theme: {
-    extend: {
-      colors: { paper:'#faf7f1', surface:'#fffdf8', ink:'#211a13', ink2:'#3a322a', muted:'#6f6558', line:'#e6ddcf', line2:'#d8cbb8', accent:'#b23a12', accentdark:'#932f0e', accentsoft:'#f7e8df', danger:'#a81e1e', price:'#8a5a00' },
-      fontFamily: { serif: ['Georgia','Noto Serif Thai','TH Sarabun New','Times New Roman','serif'], sans: ['system-ui','Noto Sans Thai','sans-serif'] }
-    }
-  }
-};
-</script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<link rel="stylesheet" href="tailwind.css">
+<script src="sweetalert2.all.min.js"></script>
 <style>
   @keyframes fade-up { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
   .animate-fade-up { animation:fade-up .6s ease both; }
