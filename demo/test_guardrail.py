@@ -166,6 +166,37 @@ class TestValueMatching(unittest.TestCase):
         self.assertIn("0.12 kg", safe)
         self.assertEqual(removed, [])
 
+    # F-1 regressions (Backend Reliability Fix, 2026-10-29): the Thai
+    # abbreviation "มล." (millilitres) was missing from _SIZE_UNITS,
+    # so size claims written that way escaped value matching entirely.
+    def test_ml_conflict_stripped(self):
+        safe, removed = server.enforce_claims(
+            "ขนาด 500 มล.", "ขนาด 600 มล.", "th")
+        self.assertEqual(safe, server.MIN_DESC["th"])
+        self.assertTrue(any("size-mismatch" in r for r in removed))
+
+    def test_ml_matching_kept(self):
+        safe, removed = server.enforce_claims(
+            "ขนาด 500 มล.", "ขนาด 500 มล.", "th")
+        self.assertIn("500 มล.", safe)
+        self.assertEqual(removed, [])
+
+    def test_ml_without_seller_facts_stripped(self):
+        safe, removed = server.enforce_claims("ขนาด 500 มล.", "", "th")
+        self.assertEqual(safe, server.MIN_DESC["th"])
+        self.assertTrue(any("size-unverified" in r for r in removed))
+
+    def test_no_size_text_unaffected(self):
+        safe, removed = server.enforce_claims(
+            "อร่อยมาก พกพาง่าย", "", "th")
+        self.assertEqual(safe, "อร่อยมาก พกพาง่าย")
+        self.assertEqual(removed, [])
+
+    def test_ml_without_dot_stripped(self):
+        safe, removed = server.enforce_claims("ขนาด 500 มล", "", "th")
+        self.assertEqual(safe, server.MIN_DESC["th"])
+        self.assertTrue(any("size-unverified" in r for r in removed))
+
     def test_partial_price_match_still_stripped(self):
         # Fail-closed: ANY unverified price in the sentence strips it,
         # even if another price in the same sentence matches.
