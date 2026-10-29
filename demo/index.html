@@ -4,235 +4,160 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SnapSell AI — ถ่ายรูปเดียว ได้การ์ดลงขาย</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: { paper:'#faf7f1', surface:'#fffdf8', ink:'#211a13', ink2:'#3a322a', muted:'#6f6558', line:'#e6ddcf', line2:'#d8cbb8', accent:'#b23a12', accentdark:'#932f0e', accentsoft:'#f7e8df', danger:'#a81e1e', price:'#8a5a00' },
+      fontFamily: { serif: ['Georgia','Noto Serif Thai','TH Sarabun New','Times New Roman','serif'], sans: ['system-ui','Noto Sans Thai','sans-serif'] }
+    }
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <style>
-  :root {
-    --paper:#faf7f1; --surface:#fffdf8; --ink:#211a13; --ink2:#3a322a;
-    --muted:#6f6558; --muted2:#8a7f71; --line:#e6ddcf; --line2:#d8cbb8;
-    --accent:#b23a12; --accent-dark:#932f0e; --accent-soft:#f7e8df;
-    --danger:#a81e1e; --price:#8a5a00;
-    --serif:Georgia,'Noto Serif Thai','TH Sarabun New','Times New Roman',serif;
-    --sans:system-ui,'Noto Sans Thai',sans-serif;
-  }
-  * { box-sizing:border-box; }
-  html { scroll-behavior:smooth; }
-  body { margin:0; font-family:var(--sans); color:var(--ink); background:var(--paper); line-height:1.75; }
-  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  header { padding:22px 24px 0; }
-  .masthead { max-width:1160px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--line); }
-  .brand { font-family:var(--serif); font-size:26px; font-weight:700; letter-spacing:-.01em; }
-  .brand span { color:var(--accent); }
-  .lang { display:flex; border:1px solid var(--line2); border-radius:999px; overflow:hidden; flex-shrink:0; background:var(--surface); }
-  .lang button { background:transparent; color:var(--muted); border:0; padding:8px 16px; font-size:14px; cursor:pointer; }
-  .lang button.active { background:var(--ink); color:var(--paper); font-weight:700; }
-  main { max-width:1160px; margin:0 auto; padding:0 24px; }
-  .hero { display:grid; grid-template-columns:1.02fr .98fr; gap:56px; align-items:center; padding:64px 0 60px; }
-  .kicker { color:var(--accent); font-size:12.5px; font-weight:700; letter-spacing:.16em; margin:0 0 18px; }
-  .hero h1 { font-family:var(--serif); margin:0 0 18px; font-size:clamp(42px,5.2vw,68px); line-height:1.1; letter-spacing:-.01em; }
-  .hero .tagline { color:var(--muted); font-size:18px; margin:0 0 28px; max-width:560px; }
-  .hero-cta { display:flex; gap:12px; flex-wrap:wrap; }
-  .btn-primary { display:inline-block; background:var(--accent); color:#fff; text-decoration:none; font-weight:700; font-size:16px; padding:13px 24px; border-radius:8px; }
-  .btn-primary:hover { background:var(--accent-dark); }
-  .btn-ghost { display:inline-block; border:1px solid var(--line2); color:var(--ink); text-decoration:none; font-weight:600; font-size:16px; padding:13px 24px; border-radius:8px; background:var(--surface); }
-  .btn-ghost:hover { border-color:var(--ink); }
-  .showcase-pair { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--surface); }
-  .showcase-pair figure { margin:0; }
-  .showcase-pair figure + figure { border-left:1px solid var(--line); }
-  .showcase-pair img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
-  .showcase-pair figcaption { font-size:12.5px; color:var(--muted); padding:8px 12px; }
-  .pipeline { border-top:1px solid var(--line); padding-top:56px; margin-top:4px; }
-  .pipeline h2, .gallery h2, .upload h2 { font-family:var(--serif); font-size:32px; margin:0 0 14px; letter-spacing:-.01em; }
-  .how { color:var(--muted); margin:0 0 28px; font-size:15.5px; max-width:760px; }
-  .how b { color:var(--accent); }
-  .process { display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--line); }
-  .process .step { padding:22px 24px 4px 0; }
-  .process .step + .step { border-left:1px solid var(--line); padding-left:24px; }
-  .step-num { display:block; font-family:var(--serif); font-size:30px; color:var(--accent); margin-bottom:6px; }
-  .step h3 { margin:0 0 6px; font-size:17px; }
-  .step p { margin:0; color:var(--muted); font-size:15px; }
-  .upload { border-top:1px solid var(--line); padding-top:56px; margin-top:56px; }
-  .bench { display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:start; margin-top:8px; }
-  .dropzone { border:1.5px dashed #c9bba6; border-radius:12px; padding:36px 16px; cursor:pointer; text-align:center; background:var(--surface); transition:border-color .18s, background .18s; }
-  .dropzone:hover, .dropzone.over { border-color:var(--accent); background:var(--accent-soft); }
-  .dropzone .icon { color:var(--ink); line-height:0; }
-  .dropzone .icon svg { width:44px; height:44px; }
-  .dropzone .dz-text { margin-top:12px; font-size:16px; font-weight:600; }
-  .dropzone .dz-sub { margin-top:4px; font-size:13px; color:var(--muted); }
-  .preview { display:none; margin:18px auto 0; max-width:420px; }
+  @keyframes fade-up { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+  .animate-fade-up { animation:fade-up .6s ease both; }
+  .animate-rise { animation:fade-up .5s ease both; }
+  .preview { display:none; }
   .preview.show { display:block; }
-  .preview img { width:100%; max-height:260px; object-fit:cover; border-radius:10px; border:1px solid var(--line); display:block; }
-  .file-chip { display:none; margin:14px auto 0; background:var(--accent-soft); border:1px solid #e8c9b8; color:#7a2c0c; border-radius:999px; padding:6px 14px; font-size:14px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-chip { display:none; }
   .file-chip.show { display:inline-block; }
-  .facts label { font-size:14px; font-weight:600; }
-  .facts textarea { width:100%; margin-top:8px; background:var(--surface); color:var(--ink); border:1px solid var(--line2); border-radius:10px; padding:12px 14px; font:inherit; font-size:15px; resize:vertical; }
-  .facts textarea:focus { border-color:var(--accent); outline:none; box-shadow:0 0 0 3px rgba(178,58,18,.12); }
-  .cta { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:14px 28px; font-size:17px; font-weight:700; cursor:pointer; margin-top:20px; width:100%; max-width:340px; transition:background .15s, opacity .15s; }
-  .cta:hover { background:var(--accent-dark); }
-  .cta:disabled { opacity:.5; }
-  .upload .note, .note { color:var(--muted); font-size:13px; margin-top:14px; line-height:1.6; }
-  #status { margin-top:12px; color:var(--muted); min-height:20px; font-size:14px; }
-  #status.error { color:var(--danger); }
-  .gallery { border-top:1px solid var(--line); padding-top:56px; margin-top:56px; }
-  .gallery-note { color:var(--muted); font-size:13px; margin:0 0 24px; }
-  .gallery-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:20px; }
-  .gallery-grid .card:nth-child(1), .gallery-grid .card:nth-child(2) { grid-column:span 3; }
-  .gallery-grid .card:nth-child(3), .gallery-grid .card:nth-child(4), .gallery-grid .card:nth-child(5) { grid-column:span 2; }
-  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-  .card:hover { border-color:var(--line2); }
-  .card h2 { font-family:var(--serif); margin:0; padding:16px 18px 6px; font-size:20px; line-height:1.35; }
-  .card .detail { padding:0 18px 14px; line-height:1.7; color:var(--ink2); font-size:15px; }
-  .pair { display:grid; grid-template-columns:1fr 1fr; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-  .pair figure { margin:0; overflow:hidden; }
-  .pair img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
-  .pair figcaption { font-size:12px; color:var(--muted); padding:6px 10px; }
-  .meta { padding:12px 18px; font-size:13px; color:var(--muted); }
-  .price { color:var(--price); font-weight:700; }
-  footer { text-align:center; color:var(--muted); font-size:13px; padding:32px 20px 40px; line-height:1.8; border-top:1px solid var(--line); margin-top:56px; }
-  @media (max-width:960px) {
-    .hero { grid-template-columns:1fr; gap:32px; padding-top:44px; }
-    .bench { grid-template-columns:1fr; gap:24px; }
-  }
-  @media (max-width:760px) {
-    .process { grid-template-columns:1fr; }
-    .process .step { padding:18px 0 4px; }
-    .process .step + .step { border-left:0; border-top:1px solid var(--line); padding-left:0; padding-top:18px; }
-    .gallery-grid .card { grid-column:span 6 !important; }
-    main { padding:0 16px; }
-    header { padding:22px 16px 0; }
-  }
+  .dropzone.over { border-color:#b23a12; background:#f7e8df; }
+  .lang button.active { background:#211a13; color:#faf7f1; font-weight:700; }
+  #status.error { color:#a81e1e; }
+  html { scroll-behavior:smooth; }
   @media (prefers-reduced-motion: reduce) {
-    * { transition:none !important; }
+    .animate-fade-up, .animate-rise { animation:none; }
     html { scroll-behavior:auto; }
   }
 </style>
 </head>
-<body>
-<header>
-  <div class="masthead">
-    <div class="brand">SnapSell <span>AI</span></div>
-    <div class="lang">
-      <button id="btn-th" class="active" onclick="setLang('th')">ไทย</button>
-      <button id="btn-en" onclick="setLang('en')">EN</button>
+<body class="bg-paper text-ink font-sans antialiased">
+<header class="sticky top-0 z-40 bg-paper/90 backdrop-blur border-b border-line">
+  <div class="max-w-[1200px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <div class="font-serif text-2xl font-bold tracking-tight">SnapSell <span class="text-accent">AI</span></div>
+    <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-muted">
+      <a href="#upload" class="hover:text-ink transition-colors" data-i18n="navStudio">สตูดิโอ</a>
+      <a href="#live" class="hover:text-ink transition-colors" data-i18n="navResults">ผลลัพธ์</a>
+      <a href="#gallery" class="hover:text-ink transition-colors" data-i18n="navGallery">การ์ดตัวอย่าง</a>
+    </nav>
+    <div class="lang flex border border-line2 rounded-full overflow-hidden bg-surface shrink-0">
+      <button id="btn-th" class="active px-4 py-2 text-sm text-muted bg-transparent border-0 cursor-pointer" onclick="setLang('th')">ไทย</button>
+      <button id="btn-en" class="px-4 py-2 text-sm text-muted bg-transparent border-0 cursor-pointer" onclick="setLang('en')">EN</button>
     </div>
   </div>
 </header>
-<main>
-  <section class="hero">
-    <div class="hero-copy">
-      <p class="kicker" data-i18n="heroKicker">META GLOBAL AI DEVELOPER HACKATHON 2026 · INDIE TRACK</p>
-      <h1 data-i18n="heroTitle">รูปเดียว ได้การ์ดลงขายพร้อมโพสต์</h1>
-      <p class="tagline" data-i18n="tagline">พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark</p>
-      <div class="hero-cta">
-        <a class="btn-primary" href="#upload" data-i18n="heroCtaTry">ลองอัปโหลดรูปเลย</a>
-        <a class="btn-ghost" href="#gallery" data-i18n="heroCtaSee">ดูผลลัพธ์จริง 5 ใบ</a>
+<main class="max-w-[1200px] mx-auto px-4 sm:px-6">
+  <section class="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center py-12 lg:py-16">
+    <div class="animate-fade-up">
+      <p class="text-accent text-xs font-bold tracking-[0.16em] mb-4" data-i18n="heroKicker">META GLOBAL AI DEVELOPER HACKATHON 2026 · INDIE TRACK</p>
+      <h1 class="font-serif font-bold leading-[1.1] tracking-tight text-[42px] md:text-[60px] mb-5" data-i18n="heroTitle">รูปเดียว ได้การ์ดลงขายพร้อมโพสต์</h1>
+      <p class="text-muted text-lg mb-7 max-w-[560px]" data-i18n="tagline">พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark</p>
+      <div class="flex flex-wrap gap-3">
+        <a href="#upload" class="inline-block bg-accent hover:bg-accentdark text-white font-bold px-6 py-3 rounded-lg transition-colors" data-i18n="heroCtaTry">ลองอัปโหลดรูปเลย</a>
+        <a href="#gallery" class="inline-block border border-line2 bg-surface hover:border-ink font-semibold px-6 py-3 rounded-lg transition-colors" data-i18n="heroCtaSee">ดูผลลัพธ์จริง 5 ใบ</a>
       </div>
     </div>
-    <div class="showcase">
-      <div class="showcase-pair">
-        <figure><img src="assets/before3.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
-        <figure><img src="assets/after3.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
-      </div>
-    </div>
-  </section>
-
-  <section class="pipeline">
-    <h2 data-i18n="pipeTitle">ระบบทำงาน 3 ขั้นในรูปเดียว</h2>
-    <div class="how" data-i18n="how"></div>
-    <div class="process">
-      <div class="step"><span class="step-num">01</span><h3 data-i18n="step1Title">SAM 3.1 หาตัวสินค้า</h3><p data-i18n="step1Desc">แยกสินค้าออกจากพื้นหลังรกและมือที่บัง</p></div>
-      <div class="step"><span class="step-num">02</span><h3 data-i18n="step2Title">Muse Image วาดรูปสตูดิโอ</h3><p data-i18n="step2Desc">พื้นสะอาด แสงสวย แต่สินค้าและฉลากยังเป็นของจริง</p></div>
-      <div class="step"><span class="step-num">03</span><h3 data-i18n="step3Title">Muse Spark เขียนข้อความลงขาย</h3><p data-i18n="step3Desc">จากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น</p></div>
-    </div>
-  </section>
-
-  <section class="upload" id="upload">
-    <h2 data-i18n="uploadTitle">ลองของจริง — อัปโหลดรูปสินค้า</h2>
-    <div class="bench">
-      <div class="bench-drop">
-        <div class="dropzone" id="dz" tabindex="0" role="button" onclick="document.getElementById('photo').click()">
-          <div class="icon"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4V8z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
-          <div class="dz-text" data-i18n="dzText">ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์</div>
-          <div class="dz-sub" data-i18n="dzSub">รองรับไฟล์รูป JPG / PNG</div>
-        </div>
-        <input type="file" id="photo" accept="image/*" hidden>
-        <figure class="preview" id="previewWrap"><img id="preview" alt=""></figure>
-        <div class="file-chip" id="chip"></div>
-      </div>
-      <div class="bench-form">
-        <div class="facts">
-          <label for="facts" data-i18n="sellerFactsLabel"></label>
-          <textarea id="facts" rows="2"></textarea>
-          <div class="note" data-i18n="sellerFactsNote"></div>
-        </div>
-        <button class="cta" id="go" onclick="process()" data-i18n="cta">ทำเป็นการ์ดลงขาย</button>
-        <div id="status" role="status" aria-live="polite"></div>
-        <div class="note" data-i18n="uploadNote">โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด</div>
+    <div class="animate-fade-up [animation-delay:120ms]">
+      <div class="grid grid-cols-2 border border-line rounded-2xl overflow-hidden bg-surface shadow-sm">
+        <figure class="m-0"><img src="assets/before3.jpg" alt="original photo" class="w-full aspect-square object-cover block"><figcaption class="text-xs text-muted px-3 py-2" data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
+        <figure class="m-0 border-l border-line"><img src="assets/after3.jpg" alt="studio photo" class="w-full aspect-square object-cover block"><figcaption class="text-xs text-muted px-3 py-2" data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
       </div>
     </div>
   </section>
-  <div id="live"></div>
 
-  <section class="gallery" id="gallery">
-  <h2 data-i18n="galleryTitle">การ์ดตัวอย่าง — ผลลัพธ์จริงทั้ง 5 ใบ</h2>
-    <div class="gallery-note" data-i18n="galleryNote">การ์ดตัวอย่างเป็นผลลัพธ์จากระบบรุ่นก่อน guardrail ข้อความอ้างอิงจากฉลากที่เห็นในรูปต้นฉบับ</div>
-  <div class="gallery-grid">
-
-  <article class="card">
-    <h2 data-i18n="t1">คาลบี้ บันบัน ขนมถั่วลันเตาอบกรอบ รสดั้งเดิม ซองใหญ่</h2>
-    <div class="pair">
-      <figure><img src="assets/before1.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
-      <figure><img src="assets/after1.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+  <section class="border-y border-line py-8">
+    <h2 class="font-serif text-[28px] mb-2" data-i18n="pipeTitle">ระบบทำงาน 3 ขั้นในรูปเดียว</h2>
+    <div class="how text-muted text-[15px] mb-6 max-w-[760px]" data-i18n="how"></div>
+    <div class="process grid md:grid-cols-3 md:divide-x md:divide-line">
+      <div class="step py-2 md:pr-6"><span class="step-num block font-serif text-3xl text-accent mb-1">01</span><h3 class="font-semibold text-[17px] mb-1" data-i18n="step1Title">SAM 3.1 หาตัวสินค้า</h3><p class="text-muted text-[15px] m-0" data-i18n="step1Desc">แยกสินค้าออกจากพื้นหลังรกและมือที่บัง</p></div>
+      <div class="step py-2 md:px-6 border-t border-line md:border-t-0"><span class="step-num block font-serif text-3xl text-accent mb-1">02</span><h3 class="font-semibold text-[17px] mb-1" data-i18n="step2Title">Muse Image วาดรูปสตูดิโอ</h3><p class="text-muted text-[15px] m-0" data-i18n="step2Desc">พื้นสะอาด แสงสวย แต่สินค้าและฉลากยังเป็นของจริง</p></div>
+      <div class="step py-2 md:pl-6 border-t border-line md:border-t-0"><span class="step-num block font-serif text-3xl text-accent mb-1">03</span><h3 class="font-semibold text-[17px] mb-1" data-i18n="step3Title">Muse Spark เขียนข้อความลงขาย</h3><p class="text-muted text-[15px] m-0" data-i18n="step3Desc">จากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น</p></div>
     </div>
-    <div class="detail" data-i18n="d1">ขนมถั่วลันเตาอบกรอบแบรนด์ Calbee BunBun รสดั้งเดิม ถุงสีเขียวตามในรูป มีลายตัวการ์ตูนถั่วลันเตาอยู่ด้านหน้า เป็นขนาดซองใหญ่ตามที่ระบุไว้บนบรรจุภัณฑ์</div>
-    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
-  </article>
+  </section>
 
-  <article class="card">
-    <h2 data-i18n="t2">โกปิโก้ ลัคกี้เดย์ กาแฟ เข้ม หวานมัน ขวดพลาสติกฝาดำ</h2>
-    <div class="pair">
-      <figure><img src="assets/before2.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปย้อนแสงที่มีมือบัง</figcaption></figure>
-      <figure><img src="assets/after2.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+  <div class="grid lg:grid-cols-[380px_1fr] gap-8 items-start py-10">
+    <section id="upload" class="upload lg:sticky lg:top-24 bg-surface border border-line rounded-2xl shadow-sm p-5 sm:p-6 animate-fade-up">
+      <h2 class="font-serif text-2xl mb-5" data-i18n="uploadTitle">ลองของจริง — อัปโหลดรูปสินค้า</h2>
+      <div class="dropzone border-[1.5px] border-dashed border-[#c9bba6] rounded-xl p-8 text-center cursor-pointer bg-paper transition-colors hover:border-accent" id="dz" tabindex="0" role="button" onclick="document.getElementById('photo').click()">
+        <div class="icon text-ink leading-none flex justify-center"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4V8z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+        <div class="dz-text mt-3 font-semibold" data-i18n="dzText">ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์</div>
+        <div class="dz-sub mt-1 text-[13px] text-muted" data-i18n="dzSub">รองรับไฟล์รูป JPG / PNG</div>
+      </div>
+      <input type="file" id="photo" accept="image/*" hidden>
+      <figure class="preview mx-auto max-w-[420px] mt-4" id="previewWrap"><img id="preview" alt="" class="w-full max-h-[260px] object-cover rounded-[10px] border border-line block"></figure>
+      <div class="file-chip mt-3 bg-accentsoft border border-[#e8c9b8] text-[#7a2c0c] rounded-full px-3.5 py-1.5 text-sm max-w-full overflow-hidden text-ellipsis whitespace-nowrap" id="chip"></div>
+      <div class="facts mt-5 text-left">
+        <label for="facts" class="text-sm font-semibold" data-i18n="sellerFactsLabel"></label>
+        <textarea id="facts" rows="2" class="w-full mt-2 bg-paper text-ink border border-line2 rounded-[10px] px-3.5 py-3 text-[15px] resize-y focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"></textarea>
+        <div class="note text-muted text-[13px] mt-3 leading-relaxed" data-i18n="sellerFactsNote"></div>
+      </div>
+      <button class="cta w-full bg-accent hover:bg-accentdark text-white font-bold text-[17px] rounded-lg px-7 py-3.5 mt-5 cursor-pointer transition-colors disabled:opacity-50" id="go" onclick="process()" data-i18n="cta">ทำเป็นการ์ดลงขาย</button>
+      <div id="status" role="status" aria-live="polite" class="mt-3 text-muted text-sm min-h-[20px]"></div>
+      <div class="note text-muted text-[13px] mt-3 leading-relaxed" data-i18n="uploadNote">โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด</div>
+    </section>
+    <div class="space-y-10 min-w-0">
+      <div id="live"></div>
+      <section class="gallery" id="gallery">
+        <h2 class="font-serif text-[30px] mb-1" data-i18n="galleryTitle">การ์ดตัวอย่าง — ผลลัพธ์จริงทั้ง 5 ใบ</h2>
+        <div class="gallery-note text-muted text-[13px] mb-6" data-i18n="galleryNote">การ์ดตัวอย่างเป็นผลลัพธ์จากระบบรุ่นก่อน guardrail ข้อความอ้างอิงจากฉลากที่เห็นในรูปต้นฉบับ</div>
+        <div class="grid gap-5 md:grid-cols-2"><article class="card group bg-surface border border-line rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-line2 animate-fade-up md:col-span-2">
+    <h2 class="font-serif text-[20px] leading-snug px-5 pt-4 pb-1" data-i18n="t1">คาลบี้ บันบัน ขนมถั่วลันเตาอบกรอบ รสดั้งเดิม ซองใหญ่</h2>
+    <div class="pair grid grid-cols-2 border-y border-line">
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/before1.jpg" alt="original photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/after1.jpg" alt="studio photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
     </div>
-    <div class="detail" data-i18n="d2">เครื่องดื่มกาแฟบรรจุในขวดพลาสติกขนาดพกพา ฝาปิดเกลียวสีดำตามในรูป ฉลากขวดสีน้ำตาลระบุว่าเป็นรสกาแฟเข้มหวานมัน สินค้าตรงตามที่เห็นในภาพ</div>
-    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+    <div class="detail px-5 pb-3 pt-1 text-[15px] leading-relaxed text-ink2" data-i18n="d1">ขนมถั่วลันเตาอบกรอบแบรนด์ Calbee BunBun รสดั้งเดิม ถุงสีเขียวตามในรูป มีลายตัวการ์ตูนถั่วลันเตาอยู่ด้านหน้า เป็นขนาดซองใหญ่ตามที่ระบุไว้บนบรรจุภัณฑ์</div>
+    <div class="meta px-5 py-3 text-[13px] text-muted"><span data-i18n="priceLabel">ราคา:</span> <span class="price font-bold text-price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
   </article>
-
-  <article class="card">
-    <h2 data-i18n="t3">แลคตาซอย นมถั่วเหลือง สูตรต้นตำรับ Original ขนาด 500 มล.</h2>
-    <div class="pair">
-      <figure><img src="assets/before3.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
-      <figure><img src="assets/after3.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+<article class="card group bg-surface border border-line rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-line2 animate-fade-up">
+    <h2 class="font-serif text-[20px] leading-snug px-5 pt-4 pb-1" data-i18n="t2">โกปิโก้ ลัคกี้เดย์ กาแฟ เข้ม หวานมัน ขวดพลาสติกฝาดำ</h2>
+    <div class="pair grid grid-cols-2 border-y border-line">
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/before2.jpg" alt="original photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capBefore">ก่อน — รูปย้อนแสงที่มีมือบัง</figcaption></figure>
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/after2.jpg" alt="studio photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
     </div>
-    <div class="detail" data-i18n="d3">นมถั่วเหลืองแลคตาซอย สูตรต้นตำรับ รสชาติอร่อยดื่มง่าย เป็นผลิตภัณฑ์ของประเทศไทย ปริมาตรสุทธิ 500 มล. บนกล่องระบุว่าให้โปรตีนและกรดอะมิโนจำเป็น เหมาะสำหรับผู้ที่ต้องการพลังงานในการดำเนินชีวิตประจำวัน และให้ความอิ่มท้องในชั่วโมงเร่งด่วน อิ่มอร่อยเต็มกล่องสำหรับคุณและทุกคนในครอบครัว</div>
-    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+    <div class="detail px-5 pb-3 pt-1 text-[15px] leading-relaxed text-ink2" data-i18n="d2">เครื่องดื่มกาแฟบรรจุในขวดพลาสติกขนาดพกพา ฝาปิดเกลียวสีดำตามในรูป ฉลากขวดสีน้ำตาลระบุว่าเป็นรสกาแฟเข้มหวานมัน สินค้าตรงตามที่เห็นในภาพ</div>
+    <div class="meta px-5 py-3 text-[13px] text-muted"><span data-i18n="priceLabel">ราคา:</span> <span class="price font-bold text-price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
   </article>
-
-  <article class="card">
-    <h2 data-i18n="t4">CIELO Sparkling Honey Lemon Soda เซโล น้ำผึ้งมะนาวโซดา 600 มล.</h2>
-    <div class="pair">
-      <figure><img src="assets/before4.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — ขวดใส พื้นหลังรก</figcaption></figure>
-      <figure><img src="assets/after4.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+<article class="card group bg-surface border border-line rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-line2 animate-fade-up">
+    <h2 class="font-serif text-[20px] leading-snug px-5 pt-4 pb-1" data-i18n="t3">แลคตาซอย นมถั่วเหลือง สูตรต้นตำรับ Original ขนาด 500 มล.</h2>
+    <div class="pair grid grid-cols-2 border-y border-line">
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/before3.jpg" alt="original photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/after3.jpg" alt="studio photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
     </div>
-    <div class="detail" data-i18n="d4">เครื่องดื่มกลิ่นน้ำผึ้งมะนาวโซดา ตราเซโล (CIELO Sparkling Honey Lemon Soda) บรรจุขวดพลาสติกใส ปริมาตรสุทธิ 600 มล. บนฉลากระบุว่ามีวิตามินซีที่มีส่วนช่วยในกระบวนการต่อต้านอนุมูลอิสระ</div>
-    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+    <div class="detail px-5 pb-3 pt-1 text-[15px] leading-relaxed text-ink2" data-i18n="d3">นมถั่วเหลืองแลคตาซอย สูตรต้นตำรับ รสชาติอร่อยดื่มง่าย เป็นผลิตภัณฑ์ของประเทศไทย ปริมาตรสุทธิ 500 มล. บนกล่องระบุว่าให้โปรตีนและกรดอะมิโนจำเป็น เหมาะสำหรับผู้ที่ต้องการพลังงานในการดำเนินชีวิตประจำวัน และให้ความอิ่มท้องในชั่วโมงเร่งด่วน อิ่มอร่อยเต็มกล่องสำหรับคุณและทุกคนในครอบครัว</div>
+    <div class="meta px-5 py-3 text-[13px] text-muted"><span data-i18n="priceLabel">ราคา:</span> <span class="price font-bold text-price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
   </article>
-
-  <article class="card">
-    <h2 data-i18n="t5">น้ำดื่ม 7 Select ขวดพลาสติกใส ฝาเขียว ฉลากเขียว</h2>
-    <div class="pair">
-      <figure><img src="assets/before5.jpg" alt="original photo"><figcaption data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
-      <figure><img src="assets/after5.jpg" alt="studio photo"><figcaption data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+<article class="card group bg-surface border border-line rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-line2 animate-fade-up">
+    <h2 class="font-serif text-[20px] leading-snug px-5 pt-4 pb-1" data-i18n="t4">CIELO Sparkling Honey Lemon Soda เซโล น้ำผึ้งมะนาวโซดา 600 มล.</h2>
+    <div class="pair grid grid-cols-2 border-y border-line">
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/before4.jpg" alt="original photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capBefore">ก่อน — ขวดใส พื้นหลังรก</figcaption></figure>
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/after4.jpg" alt="studio photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
     </div>
-    <div class="detail" data-i18n="d5">น้ำดื่มบรรจุในขวดพลาสติกใส มีฝาปิดสีเขียวและฉลากสีเขียวพิมพ์โลโก้ 7 SELECT สภาพสินค้าตามที่เห็นในรูป เหมาะสำหรับพกพาดื่มระหว่างวัน</div>
-    <div class="meta"><span data-i18n="priceLabel">ราคา:</span> <span class="price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+    <div class="detail px-5 pb-3 pt-1 text-[15px] leading-relaxed text-ink2" data-i18n="d4">เครื่องดื่มกลิ่นน้ำผึ้งมะนาวโซดา ตราเซโล (CIELO Sparkling Honey Lemon Soda) บรรจุขวดพลาสติกใส ปริมาตรสุทธิ 600 มล. บนฉลากระบุว่ามีวิตามินซีที่มีส่วนช่วยในกระบวนการต่อต้านอนุมูลอิสระ</div>
+    <div class="meta px-5 py-3 text-[13px] text-muted"><span data-i18n="priceLabel">ราคา:</span> <span class="price font-bold text-price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
   </article>
+<article class="card group bg-surface border border-line rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-line2 animate-fade-up">
+    <h2 class="font-serif text-[20px] leading-snug px-5 pt-4 pb-1" data-i18n="t5">น้ำดื่ม 7 Select ขวดพลาสติกใส ฝาเขียว ฉลากเขียว</h2>
+    <div class="pair grid grid-cols-2 border-y border-line">
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/before5.jpg" alt="original photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capBefore">ก่อน — รูปที่ถ่ายมา</figcaption></figure>
+      <figure class="overflow-hidden m-0"><img class="w-full aspect-square object-cover block transition-transform duration-500 group-hover:scale-[1.03]" src="assets/after5.jpg" alt="studio photo"><figcaption class="text-xs text-muted px-3 py-1.5" data-i18n="capAfter">หลัง — รูปสตูดิโอจาก Muse Image</figcaption></figure>
+    </div>
+    <div class="detail px-5 pb-3 pt-1 text-[15px] leading-relaxed text-ink2" data-i18n="d5">น้ำดื่มบรรจุในขวดพลาสติกใส มีฝาปิดสีเขียวและฉลากสีเขียวพิมพ์โลโก้ 7 SELECT สภาพสินค้าตามที่เห็นในรูป เหมาะสำหรับพกพาดื่มระหว่างวัน</div>
+    <div class="meta px-5 py-3 text-[13px] text-muted"><span data-i18n="priceLabel">ราคา:</span> <span class="price font-bold text-price" data-i18n="priceSoon">— (รอระบบแนะนำราคา)</span> · SAM 3.1 → Muse Image → Muse Spark</div>
+  </article></div>
+      </section>
+    </div>
   </div>
-  </section>
 </main>
-<footer data-i18n="footer">
+<footer class="border-t border-line text-center text-muted text-[13px] leading-relaxed px-5 py-8" data-i18n="footer">
   SnapSell AI — Meta Global AI Developer Hackathon 2026 (Indie track)<br>
   สร้างด้วย SAM 3.1, Muse Image 1.0 และ Muse Spark 1.3 ผ่าน Meta Model API
 </footer>
 <script>
+
 const I18N = {
   th: {
     tagline: 'พ่อค้าแม่ค้าถ่ายรูปสินค้าด้วยมือถือ รูปเละ แสงแย่ มีมือบัง — SnapSell รับรูปใบเดียวแล้วคืนการ์ดลงขายพร้อมโพสต์: รูปสตูดิโอพื้นสะอาด + ชื่อ + รายละเอียดภาษาไทย ขับเคลื่อนด้วย SAM 3.1 → Muse Image → Muse Spark',
@@ -276,7 +201,12 @@ galleryNote: 'การ์ดตัวอย่างเป็นผลลัพ
     step3Title: 'Muse Spark เขียนข้อความลงขาย',
     step3Desc: 'จากสิ่งที่เห็นในรูปจริง ไม่แต่งราคาหรือคุณสมบัติที่มองไม่เห็น',
     heroCtaTry: 'ลองอัปโหลดรูปเลย',
-    heroCtaSee: 'ดูผลลัพธ์จริง 5 ใบ'
+    heroCtaSee: 'ดูผลลัพธ์จริง 5 ใบ',
+    swalOk: 'ตกลง',
+    needsSwalText: 'มีรายการที่ต้องยืนยันก่อนลงขาย ดูรายละเอียดในการ์ดด้านบน',
+    navStudio: 'สตูดิโอ',
+    navResults: 'ผลลัพธ์',
+    navGallery: 'การ์ดตัวอย่าง'
   },
   en: {
     tagline: 'Small sellers shoot product photos on their phones — messy, badly lit, a hand in the frame. SnapSell takes one photo and returns a ready-to-post listing card: a clean studio shot + title + description. Powered by SAM 3.1 → Muse Image → Muse Spark.',
@@ -320,7 +250,12 @@ galleryNote: 'Sample cards are outputs from the pre-guardrail system; claims quo
     step3Title: 'Muse Spark writes the listing',
     step3Desc: 'From what is actually visible — never inventing a price or unseen spec',
     heroCtaTry: 'Try an upload',
-    heroCtaSee: 'See 5 real results'
+    heroCtaSee: 'See 5 real results',
+    swalOk: 'OK',
+    needsSwalText: 'Some items need confirmation before listing — see details in the card above.',
+    navStudio: 'Studio',
+    navResults: 'Results',
+    navGallery: 'Gallery'
   }
 };
 let LANG = localStorage.getItem('snapsell-lang') || 'th';
@@ -369,10 +304,11 @@ async function process() {
   const st = document.getElementById('status');
   const btn = document.getElementById('go');
   const T = I18N[LANG];
-  if (!f) { st.textContent = T.noFile; return; }
+  if (!f) { st.textContent = T.noFile; if (window.Swal) Swal.fire({icon:'warning', title:T.noFile, confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk}); return; }
   btn.disabled = true;
   st.classList.remove('error');
   st.textContent = T.processing;
+  if (window.Swal) Swal.fire({title:T.processing, allowOutsideClick:false, showConfirmButton:false, didOpen:function(){ Swal.showLoading(); }});
   const fd = new FormData();
   fd.append('photo', f);
   fd.append('lang', LANG);
@@ -380,22 +316,22 @@ async function process() {
   try {
     const r = await fetch(API_BASE + '/api/process', { method: 'POST', body: fd });
     const j = await r.json();
-    if (!j.ok) { st.textContent = T.fail + (j.error || ''); st.classList.add('error'); return; }
+    if (!j.ok) { st.textContent = T.fail + (j.error || ''); st.classList.add('error'); if (window.Swal) Swal.fire({icon:'error', title:T.fail + (j.error || ''), confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk}); return; }
     const live = document.getElementById('live');
     live.replaceChildren();
-    const art = document.createElement('article'); art.className = 'card';
-    const h2 = document.createElement('h2'); h2.textContent = T.yourCard; art.appendChild(h2);
-    const pair = document.createElement('div'); pair.className = 'pair';
-    const figB = document.createElement('figure');
-    const imgB = document.createElement('img'); imgB.src = URL.createObjectURL(f);
-    const capB = document.createElement('figcaption'); capB.textContent = T.liveBefore;
+    const art = document.createElement('article'); art.className = 'card animate-rise bg-surface border border-line rounded-2xl overflow-hidden shadow-sm';
+    const h2 = document.createElement('h2'); h2.className = 'font-serif text-xl px-5 pt-4 pb-1'; h2.textContent = T.yourCard; art.appendChild(h2);
+    const pair = document.createElement('div'); pair.className = 'pair grid grid-cols-2 border-y border-line';
+    const figB = document.createElement('figure'); figB.className = 'overflow-hidden m-0';
+    const imgB = document.createElement('img'); imgB.className = 'w-full aspect-square object-cover block'; imgB.src = URL.createObjectURL(f);
+    const capB = document.createElement('figcaption'); capB.className = 'text-xs text-muted px-3 py-1.5'; capB.textContent = T.liveBefore;
     figB.appendChild(imgB); figB.appendChild(capB); pair.appendChild(figB);
-    const figA = document.createElement('figure');
-    const imgA = document.createElement('img'); imgA.src = 'data:image/png;base64,' + j.studio_b64;
-    const capA = document.createElement('figcaption'); capA.textContent = T.liveAfter;
+    const figA = document.createElement('figure'); figA.className = 'overflow-hidden m-0';
+    const imgA = document.createElement('img'); imgA.className = 'w-full aspect-square object-cover block'; imgA.src = 'data:image/png;base64,' + j.studio_b64;
+    const capA = document.createElement('figcaption'); capA.className = 'text-xs text-muted px-3 py-1.5'; capA.textContent = T.liveAfter;
     figA.appendChild(imgA); figA.appendChild(capA); pair.appendChild(figA);
     art.appendChild(pair);
-    const detail = document.createElement('div'); detail.className = 'detail';
+    const detail = document.createElement('div'); detail.className = 'detail px-5 py-3 text-[15px] leading-relaxed text-ink2';
     detail.style.whiteSpace = 'pre-line'; detail.textContent = j.copy; art.appendChild(detail);
     if (j.needs_confirmation && j.needs_confirmation.length) {
       const needs = document.createElement('div');
@@ -406,18 +342,20 @@ async function process() {
       needs.appendChild(ul); art.appendChild(needs);
     }
     if (j.seller_facts_used) {
-      const sn = document.createElement('div'); sn.className = 'note'; sn.textContent = T.sellerNote; art.appendChild(sn);
+      const sn = document.createElement('div'); sn.className = 'note px-5 pb-1 text-xs text-muted'; sn.textContent = T.sellerNote; art.appendChild(sn);
     }
-    const meta = document.createElement('div'); meta.className = 'meta';
+    const meta = document.createElement('div'); meta.className = 'meta px-5 py-3 text-[13px] text-muted';
     meta.textContent = T.priceLabel + ' ' + T.priceSoon + ' · ' + T.foundWith + j.concept;
     art.appendChild(meta); live.appendChild(art);
     st.textContent = T.done;
+    if (window.Swal) { if (j.needs_confirmation && j.needs_confirmation.length) { Swal.fire({icon:'warning', title:T.needsTitle, text:T.needsSwalText, confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk}); } else { Swal.fire({icon:'success', title:T.done, toast:true, position:'top-end', showConfirmButton:false, timer:3000}); } }
   } catch (e) {
-    st.textContent = T.serverFail; st.classList.add('error');
+    st.textContent = T.serverFail; st.classList.add('error'); if (window.Swal) Swal.fire({icon:'error', title:T.serverFail, confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk});
   } finally {
     btn.disabled = false;
   }
 }
+
 </script>
 </body>
 </html>
