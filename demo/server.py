@@ -327,15 +327,48 @@ def run_pipeline(img_bytes, lang="th", seller_facts=""):
     else:
         prompt_text += "\n\nSeller-provided facts: none."
     prompt_text += "\n" + SELLER_NOTE.get(lang, SELLER_NOTE["th"])
-    status, spark = call("POST", "/chat/completions", {
-        "model": "muse-spark-1.3",
-        "messages": [{"role": "user", "content": [
-            {"type": "text", "text": prompt_text},
-            {"type": "image_url", "image_url": {"url": data_url}}]}],
-        "max_tokens": 2048}, timeout=180)
-    copy_text = ""
+    # F-2 (Backend Reliability Fix, 2026-10-29): Muse Spark is
+    # always-thinking -- it spends hundreds of tokens reasoning before
+    # emitting content. With max_tokens=2048 the listing task (long Thai
+    # prompt + image) burned the whole budget on reasoning and returned
+    # empty content twice in the 2026-10-29 readiness audit (verified:
+    # a trivial prompt needed ~450 reasoning tokens; a 256 budget gave
+    # finish_reason "length" with null content, a 4096 budget gave
+    # "stop" with content). 8192 is the evidence-based starting budget,
+    # not a magic number: if empty outputs persist, raise it again.
+    # Timeout raised 180 -> 300 (same as the SAM call) because the
+    # larger budget means longer generation.
+    def _spark_call():
+        return call("POST", "/chat/completions", {
+            "model": "muse-spark-1.3",
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": prompt_text},
+                {"type": "image_url", "image_url": {"url": data_url}}]}],
+            "max_tokens": 8192}, timeout=300)
+
+    def _extract(payload):
+        # Returns (copy_text, finish_reason). Any unexpected shape is
+        # treated as empty (fail-closed downstream), never a crash.
+        try:
+            choice = payload["choices"][0]
+            return (choice["message"]["content"] or "",
+                    choice.get("finish_reason"))
+        except (KeyError, IndexError, TypeError):
+            return "", "parse_error"
+
+    status, spark = _spark_call()
+    copy_text, finish_reason = "", None
+    spark_retried = False
     if status == 200:
-        copy_text = spark["choices"][0]["message"]["content"] or ""
+        copy_text, finish_reason = _extract(spark)
+    if status == 200 and not copy_text:
+        # One retry only, for the diagnosed empty-content case.
+        # A second empty result falls through to parse_copy's
+        # fail-closed path (MIN_DESC + FALLBACK_NEEDS), never invented copy.
+        spark_retried = True
+        status, spark = _spark_call()
+        if status == 200:
+            copy_text, finish_reason = _extract(spark)
     description_raw, needs, diagnostic = parse_copy(copy_text, lang)
     safe_desc, removed = enforce_claims(description_raw, seller_facts, lang)
     for entry in removed:
@@ -345,7 +378,9 @@ def run_pipeline(img_bytes, lang="th", seller_facts=""):
             "studio_b64": studio_b64, "copy": safe_desc,
             "description": safe_desc, "needs_confirmation": needs,
             "diagnostic_untrusted": diagnostic,
-            "seller_facts_used": bool((seller_facts or "").strip())}
+            "seller_facts_used": bool((seller_facts or "").strip()),
+            "spark_finish_reason": finish_reason,
+            "spark_retried": spark_retried}
 
 
 # Abuse guard for the public tunnel: the server spends the owner's Meta
