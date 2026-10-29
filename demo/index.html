@@ -14,12 +14,22 @@
   .preview.show { display:block; }
   .file-chip { display:none; }
   .file-chip.show { display:inline-block; }
-  .dropzone.over { border-color:#b23a12; background:#f7e8df; }
+  .dropzone.over { border-color:#2563eb; background:#eff6ff; }
+  .scan-wrap { position:relative; }
+  .scan-grid { display:none; position:absolute; inset:0; border-radius:10px; pointer-events:none;
+    background-image:linear-gradient(rgba(59,130,246,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,.18) 1px, transparent 1px);
+    background-size:32px 32px; }
+  .scan-line { display:none; position:absolute; left:0; right:0; height:3px; background:#3b82f6; box-shadow:0 0 12px rgba(59,130,246,.8); pointer-events:none; animation:scan-sweep 2.2s ease-in-out infinite; }
+  @keyframes scan-sweep { 0% { top:0; } 50% { top:calc(100% - 3px); } 100% { top:0; } }
+  .scan-wrap.scanning .scan-grid, .scan-wrap.scanning .scan-line { display:block; }
+  .scan-label { display:none; position:absolute; left:50%; bottom:10px; transform:translateX(-50%); background:rgba(17,24,39,.85); color:#fff; font-size:13px; padding:5px 12px; border-radius:999px; pointer-events:none; white-space:nowrap; }
+  .scan-wrap.scanning .scan-label { display:block; }
   .lang button.active { background:#211a13; color:#faf7f1; font-weight:700; }
   #status.error { color:#a81e1e; }
   html { scroll-behavior:smooth; }
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-up, .animate-rise { animation:none; }
+    .scan-line { animation:none; top:50%; }
     html { scroll-behavior:auto; }
   }
 </style>
@@ -71,13 +81,14 @@
   <div class="grid lg:grid-cols-[380px_1fr] gap-8 items-start py-10">
     <section id="upload" class="upload lg:sticky lg:top-24 bg-surface border border-line rounded-2xl shadow-sm p-5 sm:p-6 animate-fade-up">
       <h2 class="font-serif text-2xl mb-5" data-i18n="uploadTitle">ลองของจริง — อัปโหลดรูปสินค้า</h2>
-      <div class="dropzone border-[1.5px] border-dashed border-[#c9bba6] rounded-xl p-8 text-center cursor-pointer bg-paper transition-colors hover:border-accent" id="dz" tabindex="0" role="button" onclick="document.getElementById('photo').click()">
-        <div class="icon text-ink leading-none flex justify-center"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4V8z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+      <div class="dropzone border-[1.5px] border-dashed border-[#bfdbfe] rounded-2xl p-8 text-center cursor-pointer bg-white transition-colors hover:border-[#60a5fa] hover:bg-[#f8fbff]" id="dz" tabindex="0" role="button" onclick="document.getElementById('photo').click()">
+        <div class="icon text-[#2563eb] leading-none flex justify-center"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4V8z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
         <div class="dz-text mt-3 font-semibold" data-i18n="dzText">ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์</div>
         <div class="dz-sub mt-1 text-[13px] text-muted" data-i18n="dzSub">รองรับไฟล์รูป JPG / PNG</div>
+        <span class="dz-pick inline-block mt-4 bg-[#2563eb] text-white font-semibold text-sm px-5 py-2.5 rounded-full" data-i18n="dzPick">เลือกไฟล์</span>
       </div>
       <input type="file" id="photo" accept="image/*" hidden>
-      <figure class="preview mx-auto max-w-[420px] mt-4" id="previewWrap"><img id="preview" alt="" class="w-full max-h-[260px] object-cover rounded-[10px] border border-line block"></figure>
+      <figure class="preview scan-wrap mx-auto max-w-[420px] mt-4" id="previewWrap"><img id="preview" alt="" class="w-full max-h-[260px] object-cover rounded-[10px] border border-line block"><div class="scan-grid"></div><div class="scan-line"></div><span class="scan-label" data-i18n="scanLabel">กำลังสแกนรูป…</span></figure>
       <div class="file-chip mt-3 bg-accentsoft border border-[#e8c9b8] text-[#7a2c0c] rounded-full px-3.5 py-1.5 text-sm max-w-full overflow-hidden text-ellipsis whitespace-nowrap" id="chip"></div>
       <div class="facts mt-5 text-left">
         <label for="facts" class="text-sm font-semibold" data-i18n="sellerFactsLabel"></label>
@@ -86,7 +97,7 @@
       </div>
       <button class="cta w-full bg-accent hover:bg-accentdark text-white font-bold text-[17px] rounded-lg px-7 py-3.5 mt-5 cursor-pointer transition-colors disabled:opacity-50" id="go" onclick="process()" data-i18n="cta">ทำเป็นการ์ดลงขาย</button>
       <div id="status" role="status" aria-live="polite" class="mt-3 text-muted text-sm min-h-[20px]"></div>
-      <div class="note text-muted text-[13px] mt-3 leading-relaxed" data-i18n="uploadNote">โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด</div>
+      <div class="note text-muted text-[13px] mt-3 leading-relaxed" data-i18n="uploadNote">อัปโหลดได้เลยบนโฮสต์นี้ — ระบบประมวลผลรูปจริงทุกใบ (SAM → Muse Image → Muse Spark) การ์ดตัวอย่าง 5 ใบข้างล่างก็เป็นผลลัพธ์จริงจากระบบทั้งหมด</div>
     </section>
     <div class="space-y-10 min-w-0">
       <div id="live"></div>
@@ -156,7 +167,7 @@ const I18N = {
     dzText: 'ลากรูปมาวางตรงนี้ หรือแตะเพื่อเลือกไฟล์',
     dzSub: 'รองรับไฟล์รูป JPG / PNG',
     cta: 'ทำเป็นการ์ดลงขาย',
-    uploadNote: 'โหมดอัปโหลดต้องเปิดผ่านเซิร์ฟเวอร์เดโม (python3 server.py) ถ้าเปิดไฟล์นี้ตรงๆ จะใช้ไม่ได้ — แต่การ์ดตัวอย่าง 5 ใบข้างล่างดูได้เลย เพราะเป็นผลลัพธ์จริงจากระบบทั้งหมด',
+    uploadNote: 'อัปโหลดได้เลยบนโฮสต์นี้ — ระบบประมวลผลรูปจริงทุกใบ (SAM → Muse Image → Muse Spark) การ์ดตัวอย่าง 5 ใบข้างล่างก็เป็นผลลัพธ์จริงจากระบบทั้งหมด',
     galleryTitle: 'การ์ดตัวอย่าง — ผลลัพธ์จริงทั้ง 5 ใบ',
 galleryNote: 'การ์ดตัวอย่างเป็นผลลัพธ์จากระบบรุ่นก่อน guardrail ข้อความอ้างอิงจากฉลากที่เห็นในรูปต้นฉบับ',
     capBefore: 'ก่อน — รูปที่ถ่ายมา', capAfter: 'หลัง — รูปสตูดิโอจาก Muse Image',
@@ -193,6 +204,9 @@ galleryNote: 'การ์ดตัวอย่างเป็นผลลัพ
     heroCtaTry: 'ลองอัปโหลดรูปเลย',
     heroCtaSee: 'ดูผลลัพธ์จริง 5 ใบ',
     swalOk: 'ตกลง',
+    dzPick: 'เลือกไฟล์',
+    scanLabel: 'กำลังสแกนรูป…',
+    timeoutMsg: 'เซิร์ฟเวอร์ตอบช้าเกินไป — ลองใหม่อีกครั้ง',
     needsSwalText: 'มีรายการที่ต้องยืนยันก่อนลงขาย ดูรายละเอียดในการ์ดด้านบน',
     navStudio: 'สตูดิโอ',
     navResults: 'ผลลัพธ์',
@@ -205,7 +219,7 @@ galleryNote: 'การ์ดตัวอย่างเป็นผลลัพ
     dzText: 'Drop your photo here, or tap to choose a file',
     dzSub: 'JPG / PNG supported',
     cta: 'Make my listing card',
-    uploadNote: 'Live upload needs the demo server (python3 server.py). Opened as a plain file it will not work — but the 5 sample cards below are all real outputs from the full pipeline.',
+    uploadNote: 'Upload right here on this host — every photo runs through the real pipeline (SAM → Muse Image → Muse Spark). The 5 sample cards below are also real outputs from the full pipeline.',
     galleryTitle: 'Sample cards — all 5 are real outputs',
 galleryNote: 'Sample cards are outputs from the pre-guardrail system; claims quote the labels visible in the original photos.',
     capBefore: 'Before — the original photo', capAfter: 'After — studio shot by Muse Image',
@@ -242,6 +256,9 @@ galleryNote: 'Sample cards are outputs from the pre-guardrail system; claims quo
     heroCtaTry: 'Try an upload',
     heroCtaSee: 'See 5 real results',
     swalOk: 'OK',
+    dzPick: 'Select file',
+    scanLabel: 'Scanning your photo…',
+    timeoutMsg: 'The server took too long — please try again',
     needsSwalText: 'Some items need confirmation before listing — see details in the card above.',
     navStudio: 'Studio',
     navResults: 'Results',
@@ -249,8 +266,8 @@ galleryNote: 'Sample cards are outputs from the pre-guardrail system; claims quo
   }
 };
 let LANG = localStorage.getItem('snapsell-lang') || 'th';
-// API base for the live pipeline. Empty = same origin (local server.py).
-// The Pages deploy replaces __SNAPSELL_API_BASE__ with the public tunnel URL.
+// API base for the live pipeline. Empty = same origin (this host's server.py).
+// The server replaces __SNAPSELL_API_BASE__ with its own base ('' on this host) when serving this file.
 const API_BASE = '__SNAPSELL_API_BASE__';
 function setFactsPlaceholder() { const el = document.getElementById('facts'); if (el) el.placeholder = I18N[LANG].factsPlaceholder || ''; }
 function setLang(l) {
@@ -296,6 +313,8 @@ async function process() {
   const T = I18N[LANG];
   if (!f) { st.textContent = T.noFile; if (window.Swal) Swal.fire({icon:'warning', title:T.noFile, confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk}); return; }
   btn.disabled = true;
+  const scanWrap = document.getElementById('previewWrap');
+  if (scanWrap) scanWrap.classList.add('scanning');
   st.classList.remove('error');
   st.textContent = T.processing;
   if (window.Swal) Swal.fire({title:T.processing, allowOutsideClick:false, showConfirmButton:false, didOpen:function(){ Swal.showLoading(); }});
@@ -303,8 +322,10 @@ async function process() {
   fd.append('photo', f);
   fd.append('lang', LANG);
   fd.append('facts', document.getElementById('facts').value || '');
+  const ctrl = new AbortController();
+  const timer = setTimeout(function(){ ctrl.abort(); }, 600000);
   try {
-    const r = await fetch(API_BASE + '/api/process', { method: 'POST', body: fd });
+    const r = await fetch(API_BASE + '/api/process', { method: 'POST', body: fd, signal: ctrl.signal });
     const j = await r.json();
     if (!j.ok) { st.textContent = T.fail + (j.error || ''); st.classList.add('error'); if (window.Swal) Swal.fire({icon:'error', title:T.fail + (j.error || ''), confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk}); return; }
     const live = document.getElementById('live');
@@ -340,8 +361,11 @@ async function process() {
     st.textContent = T.done;
     if (window.Swal) { if (j.needs_confirmation && j.needs_confirmation.length) { Swal.fire({icon:'warning', title:T.needsTitle, text:T.needsSwalText, confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk}); } else { Swal.fire({icon:'success', title:T.done, toast:true, position:'top-end', showConfirmButton:false, timer:3000}); } }
   } catch (e) {
-    st.textContent = T.serverFail; st.classList.add('error'); if (window.Swal) Swal.fire({icon:'error', title:T.serverFail, confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk});
+    if (e && e.name === 'AbortError') { st.textContent = T.timeoutMsg; st.classList.add('error'); if (window.Swal) Swal.fire({icon:'error', title:T.timeoutMsg, confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk}); }
+    else { st.textContent = T.serverFail; st.classList.add('error'); if (window.Swal) Swal.fire({icon:'error', title:T.serverFail, confirmButtonColor:'#b23a12', confirmButtonText:T.swalOk}); }
   } finally {
+    clearTimeout(timer);
+    if (scanWrap) scanWrap.classList.remove('scanning');
     btn.disabled = false;
   }
 }
