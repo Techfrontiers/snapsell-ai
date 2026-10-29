@@ -11,9 +11,15 @@ pipeline behind POST /api/process:
 Run:  python3 server.py [port]        (default 8000, localhost only)
 Open: http://127.0.0.1:8000/
 
-Live mode calls Meta Model API through the meta_api.py helper, which
-authenticates via the connected meta-model-api account on this machine.
-Without that connection only the static gallery works.
+Live-host mode (2026-10-29): Meta Model API is called through a minimal
+stdlib client below, authenticated by the META_API_KEY environment
+variable on the host. The key lives ONLY in the host env file, never in
+code, never in the client, never in logs. Without a key the pipeline
+endpoint returns a clear configuration error; the static gallery still
+works. The VM connector helper (meta_api.py) is NOT used here because
+its surrogate-auth path does not exist on the host; the client mirrors
+its semantics (same base URL, JSON/multipart encoding, no redirects,
+(status, parsed-body) returns, HTTP errors returned not raised).
 """
 import base64
 import io
@@ -21,15 +27,100 @@ import json
 import os
 import re
 import sys
+import threading
 import time
+import urllib.error
+import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-sys.path.insert(0, os.path.expanduser(
-    "~/workspace/custom-connectors/custom.meta-model-api/bin"))
-from meta_api import call, call_multipart  # noqa: E402
-
 from PIL import Image  # noqa: E402
+
+META_API_BASE = "https://api.meta.ai/v1"
+
+
+def meta_key():
+    return os.environ.get("META_API_KEY", "").strip()
+
+
+def _parse_body(raw):
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return raw.decode("utf-8", "replace")
+
+
+def _parse_error(raw):
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return {"error": raw[:2000]}
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        raise RuntimeError("redirect refused, verify the endpoint")
+
+
+def call(method, path, body=None, timeout=300):
+    """POST JSON to the Meta Model API. Returns (status, parsed body).
+
+    HTTP errors return (status, body) without raising (callers treat
+    non-200 as a failed attempt). Network errors and redirects raise
+    and are caught by the request handler as a pipeline failure.
+    """
+    key = meta_key()
+    if not key:
+        raise RuntimeError("META_API_KEY is not set on this host")
+    req = urllib.request.Request(META_API_BASE + path, method=method)
+    data = None
+    if body is not None:
+        req.add_header("Content-Type", "application/json")
+        data = json.dumps(body).encode("utf-8")
+    req.add_header("Authorization", "Bearer " + key)
+    try:
+        with urllib.request.build_opener(_NoRedirect()).open(
+                req, data=data, timeout=timeout) as resp:
+            return resp.status, _parse_body(resp.read())
+    except urllib.error.HTTPError as e:
+        return e.code, _parse_error(e.read().decode("utf-8", "replace"))
+
+
+def call_multipart(path, fields, files, timeout=300):
+    """Multipart POST (image edits). Returns (status, parsed body)."""
+    import uuid
+    key = meta_key()
+    if not key:
+        raise RuntimeError("META_API_KEY is not set on this host")
+    boundary = uuid.uuid4().hex
+    body = b""
+    for name, value in fields.items():
+        body += ("--" + boundary + "\r\n").encode()
+        body += ('Content-Disposition: form-data; name="%s"\r\n\r\n'
+                 % name).encode()
+        body += (str(value) + "\r\n").encode()
+    for name, filename, data, ctype in files:
+        body += ("--" + boundary + "\r\n").encode()
+        body += ('Content-Disposition: form-data; name="%s"; filename="%s"\r\n'
+                 % (name, filename)).encode()
+        body += ("Content-Type: %s\r\n\r\n" % ctype).encode()
+        body += data + b"\r\n"
+    body += ("--" + boundary + "--\r\n").encode()
+    req = urllib.request.Request(META_API_BASE + path, method="POST")
+    req.add_header("Content-Type",
+                   "multipart/form-data; boundary=" + boundary)
+    req.add_header("Authorization", "Bearer " + key)
+    try:
+        with urllib.request.build_opener(_NoRedirect()).open(
+                req, data=body, timeout=timeout) as resp:
+            ctype = resp.headers.get("Content-Type", "")
+            raw = resp.read()
+            if "application/json" in ctype:
+                return resp.status, json.loads(raw.decode("utf-8", "replace"))
+            return resp.status, {"raw_bytes": len(raw),
+                                 "content_type": ctype}
+    except urllib.error.HTTPError as e:
+        return e.code, _parse_error(e.read().decode("utf-8", "replace"))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BOX_RE = re.compile(r"<\|box;x1=(\d+);y1=(\d+);x2=(\d+);y2=(\d+);w=(\d+);h=(\d+)\|>")
@@ -127,6 +218,7 @@ _SIZE_UNITS = [
     (r"กิโลกรัม|kg", "mass", 1000.0),
     (r"กรัม|\bg\b", "mass", 1.0),
     (r"มิลลิลิตร|ml", "volume", 1.0),
+    (r"มล\.?", "volume", 1.0),
     (r"ลิตร", "volume", 1000.0),
     (r"ซม\.?|cm", "length", 1.0),
     (r"มม\.?|mm", "length", 0.1),
@@ -327,15 +419,48 @@ def run_pipeline(img_bytes, lang="th", seller_facts=""):
     else:
         prompt_text += "\n\nSeller-provided facts: none."
     prompt_text += "\n" + SELLER_NOTE.get(lang, SELLER_NOTE["th"])
-    status, spark = call("POST", "/chat/completions", {
-        "model": "muse-spark-1.3",
-        "messages": [{"role": "user", "content": [
-            {"type": "text", "text": prompt_text},
-            {"type": "image_url", "image_url": {"url": data_url}}]}],
-        "max_tokens": 2048}, timeout=180)
-    copy_text = ""
+    # F-2 (Backend Reliability Fix, 2026-10-29): Muse Spark is
+    # always-thinking -- it spends hundreds of tokens reasoning before
+    # emitting content. With max_tokens=2048 the listing task (long Thai
+    # prompt + image) burned the whole budget on reasoning and returned
+    # empty content twice in the 2026-10-29 readiness audit (verified:
+    # a trivial prompt needed ~450 reasoning tokens; a 256 budget gave
+    # finish_reason "length" with null content, a 4096 budget gave
+    # "stop" with content). 8192 is the evidence-based starting budget,
+    # not a magic number: if empty outputs persist, raise it again.
+    # Timeout raised 180 -> 300 (same as the SAM call) because the
+    # larger budget means longer generation.
+    def _spark_call():
+        return call("POST", "/chat/completions", {
+            "model": "muse-spark-1.3",
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": prompt_text},
+                {"type": "image_url", "image_url": {"url": data_url}}]}],
+            "max_tokens": 8192}, timeout=300)
+
+    def _extract(payload):
+        # Returns (copy_text, finish_reason). Any unexpected shape is
+        # treated as empty (fail-closed downstream), never a crash.
+        try:
+            choice = payload["choices"][0]
+            return (choice["message"]["content"] or "",
+                    choice.get("finish_reason"))
+        except (KeyError, IndexError, TypeError):
+            return "", "parse_error"
+
+    status, spark = _spark_call()
+    copy_text, finish_reason = "", None
+    spark_retried = False
     if status == 200:
-        copy_text = spark["choices"][0]["message"]["content"] or ""
+        copy_text, finish_reason = _extract(spark)
+    if status == 200 and not copy_text:
+        # One retry only, for the diagnosed empty-content case.
+        # A second empty result falls through to parse_copy's
+        # fail-closed path (MIN_DESC + FALLBACK_NEEDS), never invented copy.
+        spark_retried = True
+        status, spark = _spark_call()
+        if status == 200:
+            copy_text, finish_reason = _extract(spark)
     description_raw, needs, diagnostic = parse_copy(copy_text, lang)
     safe_desc, removed = enforce_claims(description_raw, seller_facts, lang)
     for entry in removed:
@@ -345,7 +470,9 @@ def run_pipeline(img_bytes, lang="th", seller_facts=""):
             "studio_b64": studio_b64, "copy": safe_desc,
             "description": safe_desc, "needs_confirmation": needs,
             "diagnostic_untrusted": diagnostic,
-            "seller_facts_used": bool((seller_facts or "").strip())}
+            "seller_facts_used": bool((seller_facts or "").strip()),
+            "spark_finish_reason": finish_reason,
+            "spark_retried": spark_retried}
 
 
 # Abuse guard for the public tunnel: the server spends the owner's Meta
@@ -364,6 +491,92 @@ def rate_ok(ip):
     return True
 
 
+# Host abuse guards (live-host round, 2026-10-29), layered on the
+# per-IP hourly limit above. The goal is "burn slowly + burn bounded":
+# no single protection is complete without accounts, so the server
+# caps total spend, refuses instantly on a kill-switch file, and
+# validates uploads before any credit is spent.
+def _env_int(name, default):
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+DAILY_CAP = _env_int("SNAPSELL_DAILY_CAP", 200)
+MAX_UPLOAD_MB = _env_int("SNAPSELL_MAX_UPLOAD_MB", 10)
+MAX_CONCURRENT = _env_int("SNAPSELL_MAX_CONCURRENT", 2)
+PAUSE_FILE = os.environ.get("SNAPSELL_PAUSE_FILE", "")
+API_BASE_VALUE = os.environ.get("SNAPSELL_API_BASE", "")
+
+_day = {"date": None, "count": 0}
+_slots = threading.Semaphore(MAX_CONCURRENT)
+
+
+def client_ip(headers, fallback):
+    """Real client IP behind nginx + Cloudflare.
+
+    nginx sets X-Real-IP from CF-Connecting-IP (real user) falling back
+    to $remote_addr (edge IP when not proxied). The server binds
+    localhost only, so only nginx on this host can reach it; a spoofed
+    header requires local access already.
+    """
+    v = headers.get("X-Real-IP", "")
+    if v:
+        return v.strip()
+    return fallback
+
+
+def paused():
+    return bool(PAUSE_FILE) and os.path.exists(PAUSE_FILE)
+
+
+def day_ok():
+    """Count one started pipeline against today's cap. UTC day."""
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if _day["date"] != today:
+        _day["date"] = today
+        _day["count"] = 0
+    if _day["count"] >= DAILY_CAP:
+        return False
+    _day["count"] += 1
+    return True
+
+
+ALLOWED_STATIC = {"index.html", "tailwind.css", "sweetalert2.all.min.js"}
+
+
+def is_allowed(path):
+    """Static allowlist: the old handler served ANY file under demo/
+    (including server.py itself). Only the page, its two local assets,
+    and gallery images are servable now."""
+    if path in ALLOWED_STATIC:
+        return True
+    if path.startswith("assets/") and path.rsplit(".", 1)[-1].lower() \
+            in ("jpg", "jpeg", "png"):
+        return True
+    return False
+
+
+def serve_index(handler):
+    """Serve index.html with the API base placeholder substituted.
+
+    This is the API_BASE fix: the page used to fetch
+    /__SNAPSELL_API_BASE__/api/process (404) because nothing replaced
+    the placeholder when server.py served the file. Same-origin on
+    this host, so the default substitution is ''.
+    """
+    with open(os.path.join(HERE, "index.html"), "rb") as f:
+        data = f.read()
+    data = data.replace(b"__SNAPSELL_API_BASE__",
+                        API_BASE_VALUE.encode("utf-8"))
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Content-Length", str(len(data)))
+    handler.end_headers()
+    handler.wfile.write(data)
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=HERE, **kwargs)
@@ -371,41 +584,109 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-    def _cors(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+    def _log(self, msg):
+        # Operational log only: IP + outcome. Never facts, photo
+        # bytes, or any credential.
+        sys.stderr.write("[%s] %s\n" % (
+            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), msg))
+        sys.stderr.flush()
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self._cors()
-        self.send_header("Content-Length", "0")
-        self.end_headers()
+    def do_GET(self):
+        path = urlparse(self.path).path.lstrip("/")
+        if path in ("", "index.html"):
+            serve_index(self)
+            return
+        if not is_allowed(path):
+            self.send_error(404)
+            return
+        super().do_GET()
+
+    def do_HEAD(self):
+        path = urlparse(self.path).path.lstrip("/")
+        if path in ("", "index.html"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            return
+        if not is_allowed(path):
+            self.send_error(404)
+            return
+        super().do_HEAD()
 
     def do_POST(self):
         if urlparse(self.path).path != "/api/process":
             self.send_error(404)
             return
+        ip = client_ip(self.headers, self.client_address[0])
         import cgi
-        form = cgi.FieldStorage(fp=self.rfile, headers=self.headers,
+        # Read the body bounded by Content-Length, then parse from
+        # memory. Letting cgi read straight from the socket hangs on
+        # degenerate multiparts (zero parts: its part loop keeps
+        # reading past the body waiting for a part that never comes).
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        raw_body = self.rfile.read(length) if length > 0 else b""
+        form = cgi.FieldStorage(fp=io.BytesIO(raw_body),
+                                headers=self.headers,
                                 environ={"REQUEST_METHOD": "POST",
                                          "CONTENT_TYPE": self.headers.get("Content-Type", "")})
-        if not rate_ok(self.client_address[0]):
-            result = {"ok": False,
-                      "error": "ถึงลิมิตการอัปโหลดแล้ว (20 ครั้ง/ชั่วโมง) / Upload limit reached (20/hour)"}
+        lang = form.getvalue("lang", "th") if "lang" in form else "th"
+        lang = lang if lang in ("th", "en") else "th"
+
+        def err(th, en):
+            return {"ok": False, "error": th if lang == "th" else en}
+
+        if paused():
+            result = err("ปิดรับอัปโหลดชั่วคราว — ลองใหม่ภายหลัง",
+                         "Uploads are paused for now — please try again later")
+        elif not meta_key():
+            result = err("เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า API key — ผู้ดูแลต้องใส่ key ก่อน",
+                         "The server API key is not configured yet")
+        elif not rate_ok(ip):
+            result = err("ถึงลิมิตการอัปโหลดแล้ว (20 ครั้ง/ชั่วโมง)",
+                         "Upload limit reached (20/hour)")
         elif "photo" not in form or not form["photo"].file:
-            result = {"ok": False, "error": "ไม่พบไฟล์รูป"}
+            result = err("ไม่พบไฟล์รูป", "No photo file received")
         else:
             img_bytes = form["photo"].file.read()
-            lang = form.getvalue("lang", "th") if "lang" in form else "th"
-            facts = form.getvalue("facts", "") if "facts" in form else ""
-            try:
-                result = run_pipeline(img_bytes, lang, facts)
-            except Exception as e:  # never leak a stack trace to the client
-                result = {"ok": False, "error": "pipeline ล้ม: %s" % e}
+            ctype = getattr(form["photo"], "type", "") or ""
+            if len(img_bytes) > MAX_UPLOAD_MB * 1024 * 1024:
+                result = err("ไฟล์ใหญ่เกิน %d MB" % MAX_UPLOAD_MB,
+                             "File exceeds %d MB" % MAX_UPLOAD_MB)
+            elif not ctype.startswith("image/"):
+                result = err("ไฟล์ที่อัปโหลดไม่ใช่รูปภาพ",
+                             "Uploaded file is not an image")
+            else:
+                try:
+                    Image.open(io.BytesIO(img_bytes)).load()
+                except Exception:
+                    result = err("ไฟล์รูปเสียหรือไม่รองรับ",
+                                 "Image file is corrupt or unsupported")
+                else:
+                    facts = form.getvalue("facts", "") \
+                        if "facts" in form else ""
+                    if not day_ok():
+                        result = err("โควต้าเดโมวันนี้เต็มแล้ว — ลองใหม่พรุ่งนี้",
+                                     "Today's demo quota is full — please try again tomorrow")
+                    elif not _slots.acquire(blocking=False):
+                        result = err("เซิร์ฟเวอร์กำลังยุ่ง — ลองใหม่อีกครั้ง",
+                                     "Server is busy — please try again")
+                    else:
+                        try:
+                            result = run_pipeline(img_bytes, lang, facts)
+                        except Exception as e:  # never leak a stack trace
+                            result = err("pipeline ล้ม: %s" % e,
+                                         "Pipeline failed: %s" % e)
+                        finally:
+                            _slots.release()
+        self._log("POST /api/process ip=%s ok=%s" % (ip, result.get("ok")))
         body = json.dumps(result, ensure_ascii=False).encode("utf-8")
         self.send_response(200)
-        self._cors()
+        # No CORS headers on purpose: the page is same-origin on this
+        # host, and granting * would let any site read pipeline
+        # results (and spend credits) from a browser.
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
