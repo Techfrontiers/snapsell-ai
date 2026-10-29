@@ -10,20 +10,23 @@ Covers the original Phase 1 behavior plus GPT review items (a)-(g):
 (f) empty Spark response and non-200 response fallback,
 (g) safe rendering of HTML-like model text (static check on index.html).
 
-The server's Meta client is stubbed out before import. run_pipeline
-tests monkeypatch SAM/Image/Spark calls so no real API is used.
+Plus the live-host hardening round (2026-10-29): static allowlist,
+API_BASE substitution, client-IP handling, pause switch, daily cap,
+and the HTTP guard chain (key/rate/size/type/cap) — all without any
+real Meta API call. run_pipeline tests monkeypatch SAM/Image/Spark
+calls so no real API is used.
 Run: python3 test_guardrail.py
 """
+import base64
 import io
+import json
 import os
 import sys
-import types
+import threading
 import unittest
-
-stub = types.ModuleType("meta_api")
-stub.call = lambda *a, **k: (500, {})
-stub.call_multipart = lambda *a, **k: (500, {})
-sys.modules["meta_api"] = stub
+import urllib.request
+from http.server import ThreadingHTTPServer
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import server  # noqa: E402
@@ -166,6 +169,37 @@ class TestValueMatching(unittest.TestCase):
         self.assertIn("0.12 kg", safe)
         self.assertEqual(removed, [])
 
+    # F-1 regressions (Backend Reliability Fix, 2026-10-29): the Thai
+    # abbreviation "มล." (millilitres) was missing from _SIZE_UNITS,
+    # so size claims written that way escaped value matching entirely.
+    def test_ml_conflict_stripped(self):
+        safe, removed = server.enforce_claims(
+            "ขนาด 500 มล.", "ขนาด 600 มล.", "th")
+        self.assertEqual(safe, server.MIN_DESC["th"])
+        self.assertTrue(any("size-mismatch" in r for r in removed))
+
+    def test_ml_matching_kept(self):
+        safe, removed = server.enforce_claims(
+            "ขนาด 500 มล.", "ขนาด 500 มล.", "th")
+        self.assertIn("500 มล.", safe)
+        self.assertEqual(removed, [])
+
+    def test_ml_without_seller_facts_stripped(self):
+        safe, removed = server.enforce_claims("ขนาด 500 มล.", "", "th")
+        self.assertEqual(safe, server.MIN_DESC["th"])
+        self.assertTrue(any("size-unverified" in r for r in removed))
+
+    def test_no_size_text_unaffected(self):
+        safe, removed = server.enforce_claims(
+            "อร่อยมาก พกพาง่าย", "", "th")
+        self.assertEqual(safe, "อร่อยมาก พกพาง่าย")
+        self.assertEqual(removed, [])
+
+    def test_ml_without_dot_stripped(self):
+        safe, removed = server.enforce_claims("ขนาด 500 มล", "", "th")
+        self.assertEqual(safe, server.MIN_DESC["th"])
+        self.assertTrue(any("size-unverified" in r for r in removed))
+
     def test_partial_price_match_still_stripped(self):
         # Fail-closed: ANY unverified price in the sentence strips it,
         # even if another price in the same sentence matches.
@@ -255,6 +289,177 @@ class TestSafeRendering(unittest.TestCase):
         html = open(os.path.join(HERE, "index.html")).read()
         self.assertIn("a match does not mean verified", html)
         self.assertIn("ค่าที่ตรงกันไม่ได้แปลว่าผ่านการตรวจสอบแล้ว", html)
+
+
+class TestHostGuards(unittest.TestCase):
+    def test_allowlist(self):
+        self.assertTrue(server.is_allowed("index.html"))
+        self.assertTrue(server.is_allowed("tailwind.css"))
+        self.assertTrue(server.is_allowed("sweetalert2.all.min.js"))
+        self.assertTrue(server.is_allowed("assets/before1.jpg"))
+        self.assertTrue(server.is_allowed("assets/after3.png"))
+        self.assertFalse(server.is_allowed("server.py"))
+        self.assertFalse(server.is_allowed("test_guardrail.py"))
+        self.assertFalse(server.is_allowed("tailwind.config.js"))
+        self.assertFalse(server.is_allowed("assets/../server.py"))
+        self.assertFalse(server.is_allowed(".env"))
+        self.assertFalse(server.is_allowed("../etc/passwd"))
+
+    def test_client_ip_prefers_header(self):
+        self.assertEqual(server.client_ip({"X-Real-IP": "203.0.113.5"},
+                                          "127.0.0.1"), "203.0.113.5")
+        self.assertEqual(server.client_ip({"X-Real-IP": ""},
+                                          "127.0.0.1"), "127.0.0.1")
+        self.assertEqual(server.client_ip({}, "127.0.0.1"), "127.0.0.1")
+
+    def test_api_base_substitution(self):
+        class FakeHandler:
+            def __init__(self):
+                self.buf = io.BytesIO()
+                self.wfile = self.buf
+                self.status = None
+            def send_response(self, code):
+                self.status = code
+            def send_header(self, *a):
+                pass
+            def end_headers(self):
+                pass
+        with mock.patch.object(server, "API_BASE_VALUE", ""):
+            h = FakeHandler()
+            server.serve_index(h)
+            self.assertEqual(h.status, 200)
+            self.assertNotIn(b"__SNAPSELL_API_BASE__", h.buf.getvalue())
+            self.assertIn(b"/api/process", h.buf.getvalue())
+        with mock.patch.object(server, "API_BASE_VALUE", "https://x.test"):
+            h = FakeHandler()
+            server.serve_index(h)
+            # The page builds the URL as API_BASE + '/api/process', so
+            # the substituted file holds the base value, not the joined URL.
+            self.assertIn(b"const API_BASE = 'https://x.test'", h.buf.getvalue())
+            self.assertNotIn(b"__SNAPSELL_API_BASE__", h.buf.getvalue())
+
+    def test_pause_and_daily_cap(self):
+        with mock.patch.object(server, "PAUSE_FILE", ""):
+            self.assertFalse(server.paused())
+        with mock.patch.object(server, "PAUSE_FILE", __file__):
+            self.assertTrue(server.paused())
+        with mock.patch.object(server, "DAILY_CAP", 2):
+            server._day["date"] = None
+            server._day["count"] = 0
+            self.assertTrue(server.day_ok())
+            self.assertTrue(server.day_ok())
+            self.assertFalse(server.day_ok())
+
+    def test_meta_key_missing_raises(self):
+        with mock.patch.dict(os.environ, {"META_API_KEY": ""}):
+            self.assertEqual(server.meta_key(), "")
+            with self.assertRaises(RuntimeError):
+                server.call("POST", "/responses", {})
+        with mock.patch.dict(os.environ, {"META_API_KEY": "  key-x  "}):
+            self.assertEqual(server.meta_key(), "key-x")
+
+
+PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+
+
+class TestHttpGuardChain(unittest.TestCase):
+    def setUp(self):
+        server._rate = {}
+        server._day["date"] = None
+        server._day["count"] = 0
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        self.port = self.httpd.server_address[1]
+        self.thread = threading.Thread(target=self.httpd.serve_forever,
+                                       daemon=True)
+        self.thread.start()
+
+    def tearDown(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+    def _req(self, path, body=None, headers=None):
+        # No-proxy opener: the VM sets an egress proxy that cannot
+        # reach 127.0.0.1, and urlopen would otherwise route there.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        req = urllib.request.Request(
+            "http://127.0.0.1:%d%s" % (self.port, path),
+            data=body, headers=headers or {}, method="POST" if body is not None else "GET")
+        try:
+            with opener.open(req, timeout=10) as resp:
+                return resp.status, resp.read()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read()
+
+    def _multipart(self, fields, files):
+        boundary = "TESTBOUNDARY"
+        body = b""
+        for name, value in fields.items():
+            body += ('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n'
+                     % (boundary, name, value)).encode()
+        for name, filename, data, ctype in files:
+            body += ('--%s\r\nContent-Disposition: form-data; name="%s"; filename="%s"\r\n'
+                     'Content-Type: %s\r\n\r\n' % (boundary, name, filename, ctype)).encode()
+            body += data + b"\r\n"
+        body += ("--%s--\r\n" % boundary).encode()
+        return body, {"Content-Type": "multipart/form-data; boundary=" + boundary}
+
+    def test_static_allowlist_over_http(self):
+        status, body = self._req("/server.py")
+        self.assertEqual(status, 404)
+        status, body = self._req("/index.html")
+        self.assertEqual(status, 200)
+        self.assertNotIn(b"__SNAPSELL_API_BASE__", body)
+        status, body = self._req("/tailwind.css")
+        self.assertEqual(status, 200)
+
+    def test_missing_key_returns_config_error(self):
+        body, headers = self._multipart({}, [])
+        with mock.patch.dict(os.environ, {"META_API_KEY": ""}):
+            status, raw = self._req("/api/process", body, headers)
+        self.assertEqual(status, 200)
+        self.assertFalse(json.loads(raw)["ok"])
+        self.assertIn("API key", json.loads(raw)["error"])
+
+    def test_pause_beats_key_check(self):
+        body, headers = self._multipart({"lang": "en"}, [])
+        with mock.patch.object(server, "PAUSE_FILE", __file__):
+            status, raw = self._req("/api/process", body, headers)
+        self.assertIn("paused", json.loads(raw)["error"])
+
+    def test_rate_limit_second_request_rejected(self):
+        body, headers = self._multipart({"lang": "en"}, [])
+        with mock.patch.dict(os.environ, {"META_API_KEY": "dummy"}):
+            with mock.patch.object(server, "RATE_LIMIT_PER_IP_PER_HOUR", 1):
+                status, raw1 = self._req("/api/process", body, headers)
+                status, raw2 = self._req("/api/process", body, headers)
+        self.assertIn("No photo", json.loads(raw1)["error"])
+        self.assertIn("limit", json.loads(raw2)["error"])
+
+    def test_upload_validation_chain(self):
+        with mock.patch.dict(os.environ, {"META_API_KEY": "dummy"}):
+            body, headers = self._multipart(
+                {"lang": "en"},
+                [("photo", "x.txt", b"hello", "text/plain")])
+            _, raw = self._req("/api/process", body, headers)
+            self.assertIn("not an image", json.loads(raw)["error"])
+            body, headers = self._multipart(
+                {"lang": "en"},
+                [("photo", "x.png", b"not a png", "image/png")])
+            _, raw = self._req("/api/process", body, headers)
+            self.assertIn("corrupt", json.loads(raw)["error"])
+            with mock.patch.object(server, "MAX_UPLOAD_MB", 0):
+                body, headers = self._multipart(
+                    {"lang": "en"},
+                    [("photo", "x.png", PNG_1X1, "image/png")])
+                _, raw = self._req("/api/process", body, headers)
+            self.assertIn("exceeds", json.loads(raw)["error"])
+            with mock.patch.object(server, "DAILY_CAP", 0):
+                body, headers = self._multipart(
+                    {"lang": "en"},
+                    [("photo", "x.png", PNG_1X1, "image/png")])
+                _, raw = self._req("/api/process", body, headers)
+            self.assertIn("quota", json.loads(raw)["error"])
 
 
 if __name__ == "__main__":
